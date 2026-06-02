@@ -2,6 +2,7 @@
 
 Hey there! 👋 Thanks for wanting to contribute to Hunty. We're excited to have you on board! This guide will help you get started and make your first contribution smooth and enjoyable.
 
+
 ## First Things First
 
 Before diving in, let's make sure you have everything you need to get started. Don't worry if you're new to Soroban or Rust - we've all been there, and we're here to help!
