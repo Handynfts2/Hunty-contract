@@ -607,6 +607,53 @@ mod test {
     }
 
     #[test]
+    fn test_add_clue_whitespace_answer_normalization_and_hashing() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        env.mock_all_auths();
+        let creator = Address::generate(&env);
+        let title = String::from_str(&env, "Hunt");
+        let description = String::from_str(&env, "Desc");
+        let question = String::from_str(&env, "Whitespace answer?");
+        let answer1 = String::from_str(&env, "\t\n answer \r\n");
+        let answer2 = String::from_str(&env, "answer");
+
+        let (hash1, hash2) = with_core_contract(&env, |env, _cid| {
+            let hid = HuntyCore::create_hunt(
+                env.clone(),
+                creator,
+                title,
+                description.clone(),
+                None,
+                None,
+            )
+            .unwrap();
+            let cid = HuntyCore::add_clue(env.clone(), hid, question.clone(), answer1, 5, false)
+                .unwrap();
+            let c = Storage::get_clue(env, hid, cid).unwrap();
+            let h1 = c.answer_hash;
+            let hid2 = HuntyCore::create_hunt(
+                env.clone(),
+                Address::generate(&env),
+                String::from_str(&env, "H2"),
+                description,
+                None,
+                None,
+            )
+            .unwrap();
+            let _cid2 = HuntyCore::add_clue(env.clone(), hid2, question, answer2, 5, false).unwrap();
+            let c2 = Storage::get_clue(env, hid2, _cid2).unwrap();
+            let h2 = c2.answer_hash;
+            (h1, h2)
+        });
+
+        assert_eq!(
+            hash1, hash2,
+            "normalized '\t\n answer \r\n' and 'answer' must hash the same"
+        );
+    }
+
+    #[test]
     fn test_add_clue_unicode_answer_normalization_and_hashing() {
         let env = Env::default();
         env.ledger().set_timestamp(1_700_000_000);

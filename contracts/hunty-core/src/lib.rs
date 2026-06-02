@@ -313,23 +313,12 @@ impl HuntyCore {
 
         let mut buf = [0u8; MAX_ANSWER_LENGTH as usize];
         answer.copy_into_slice(&mut buf[..n as usize]);
-        let mut start = 0usize;
-        let mut end = n as usize;
-        while start < end && Self::is_ascii_space(buf[start]) {
-            start += 1;
-        }
-        while end > start && Self::is_ascii_space(buf[end - 1]) {
-            end -= 1;
-        }
-        if start >= end {
+        let text = core::str::from_utf8(&buf[..n as usize]).map_err(|_| HuntError::InvalidAnswer)?;
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
             return Err(HuntError::InvalidAnswer);
         }
-        let slice = &buf[start..end];
-        let text = core::str::from_utf8(slice).map_err(|_| HuntError::InvalidAnswer)?;
-        let normalized = text.to_lowercase();
-        if normalized.is_empty() {
-            return Err(HuntError::InvalidAnswer);
-        }
+        let normalized = trimmed.to_lowercase();
         let normalized = Bytes::from_slice(env, normalized.as_bytes());
         let hash = env.crypto().sha256(&normalized);
         Ok(hash.to_bytes())
@@ -341,11 +330,6 @@ impl HuntyCore {
 
 
     
-
-    #[inline]
-    fn is_ascii_space(b: u8) -> bool {
-        b == 0x20 || b == 0x09 || b == 0x0a || b == 0x0d
-    }
 
     #[inline]
     fn validate_rarity(v: u32) -> bool {
@@ -570,33 +554,6 @@ impl HuntyCore {
         let mut progress = Storage::get_player_progress_or_error(env, hunt_id, &player)
             .map_err(HuntErrorCode::from)?;
 
-                /// Generates a completion certificate for a player who has finished a hunt.
-    pub fn generate_completion_certificate(
-        env: Env,
-        hunt_id: u64,
-        player: Address,
-    ) -> Result<String, HuntErrorCode> {
-        let progress = Storage::get_player_progress(&env, hunt_id, &player)
-            .ok_or(HuntErrorCode::PlayerNotRegistered)?;
-
-        if !progress.is_completed {
-            return Err(HuntErrorCode::HuntNotCompleted);
-        }
-
-        let hunt = Storage::get_hunt(&env, hunt_id)
-            .ok_or(HuntErrorCode::HuntNotFound)?;
-
-        let certificate = String::from_str(
-            &env,
-            "COMPLETION_CERTIFICATE",
-        );
-
-        let _ = hunt;
-        let _ = progress;
-
-        Ok(certificate)
-    }
-
         // Verify the player has completed all required clues
         if !progress.is_completed {
             return Err(HuntErrorCode::HuntNotCompleted);
@@ -759,6 +716,30 @@ impl HuntyCore {
             .publish((Symbol::new(env, "RewardClaimed"), hunt_id), event);
 
         Ok(())
+    }
+
+    /// Generates a completion certificate for a player who has finished a hunt.
+    pub fn generate_completion_certificate(
+        env: Env,
+        hunt_id: u64,
+        player: Address,
+    ) -> Result<String, HuntErrorCode> {
+        let progress = Storage::get_player_progress(&env, hunt_id, &player)
+            .ok_or(HuntErrorCode::PlayerNotRegistered)?;
+
+        if !progress.is_completed {
+            return Err(HuntErrorCode::HuntNotCompleted);
+        }
+
+        let hunt = Storage::get_hunt(&env, hunt_id)
+            .ok_or(HuntErrorCode::HuntNotFound)?;
+
+        let certificate = String::from_str(&env, "COMPLETION_CERTIFICATE");
+
+        let _ = hunt;
+        let _ = progress;
+
+        Ok(certificate)
     }
 
     /// Registers a player for an active hunt. The caller must pass their address and authorize;
