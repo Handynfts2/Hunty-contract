@@ -568,6 +568,15 @@ impl HuntyCore {
 
         // Update hunt reward config
         hunt.reward_config.claimed_count += 1;
+        
+        // Mark hunt as completed if all reward slots are taken
+        if hunt.reward_config.claimed_count >= hunt.reward_config.max_winners {
+            hunt.status = HuntStatus::Completed;
+            
+            // Optionally, we could emit a HuntStatusChangedEvent or HuntEndedEvent here 
+            // if we want to notify clients that the hunt is completely finished.
+        }
+        
         Storage::save_hunt(env, &hunt);
 
         // Emit RewardClaimedEvent

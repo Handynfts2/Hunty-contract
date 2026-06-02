@@ -2657,12 +2657,12 @@ mod test {
             .unwrap();
         });
 
-        // Player2 tries to claim — no slots left
+        // Player2 tries to claim — no slots left (Hunt is now Completed)
         env.mock_all_auths();
         let result = as_core_contract(&env, &contract_id, |env| {
             HuntyCore::complete_hunt(env.clone(), hunt_id, player2.clone())
         });
-        assert_eq!(result, Err(HuntErrorCode::InsufficientRewardPool));
+        assert_eq!(result, Err(HuntErrorCode::InvalidHuntStatus));
     }
 
     #[test]
