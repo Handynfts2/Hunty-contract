@@ -913,7 +913,7 @@ impl HuntyCore {
             if p.is_completed {
                 completed_count += 1;
             }
-            total_score_sum += p.total_score as u64;
+            total_score_sum = total_score_sum.saturating_add(p.total_score as u64);
         }
         let completion_rate_percent = if total_players > 0 {
             (completed_count * 100) / total_players
@@ -921,7 +921,8 @@ impl HuntyCore {
             0
         };
         let average_score = if total_players > 0 {
-            (total_score_sum / (total_players as u64)) as u32
+            let avg = total_score_sum / (total_players as u64);
+            avg.min(u32::MAX as u64) as u32
         } else {
             0
         };
