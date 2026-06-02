@@ -436,17 +436,16 @@ impl RewardManager {
         hunt_id: u64,
         player: Address,
     ) -> DistributionStatus {
-        let distributed = Storage::is_distributed(&env, hunt_id, &player);
         let record = Storage::get_distribution_record(&env, hunt_id, &player);
 
         match record {
             Some(r) => DistributionStatus {
-                distributed,
+                distributed: true,
                 xlm_amount: r.xlm_amount,
                 nft_id: r.nft_id,
             },
             None => DistributionStatus {
-                distributed,
+                distributed: false,
                 xlm_amount: 0,
                 nft_id: None,
             },

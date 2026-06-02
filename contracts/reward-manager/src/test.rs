@@ -5,7 +5,7 @@ mod test {
     use crate::types::RewardConfig;
     use crate::RewardManager;
     use soroban_sdk::testutils::{Address as _, Ledger as _};
-    use soroban_sdk::{token, Address, Env};
+    use soroban_sdk::{symbol_short, token, Address, Env};
 
     /// Registers the RewardManager contract and a mock SAC token.
     /// Returns (contract_id, token_address, token_admin).
@@ -853,6 +853,31 @@ mod test {
             // After distribution
             let config = xlm_only_config(&env, 2_000);
             RewardManager::distribute_rewards(env.clone(), 1, player.clone(), config).unwrap();
+
+            let status = RewardManager::get_distribution_status(env.clone(), 1, player.clone());
+            assert!(status.distributed);
+            assert_eq!(status.xlm_amount, 2_000);
+            assert_eq!(status.nft_id, None);
+        });
+    }
+
+    #[test]
+    fn test_get_distribution_status_ignores_stale_bool_flag() {
+        let env = Env::default();
+        let (contract_id, _, _) = setup(&env);
+        let player = Address::generate(&env);
+
+        env.as_contract(&contract_id, || {
+            let record = crate::types::DistributionRecord {
+                xlm_amount: 2_000,
+                nft_id: None,
+            };
+            Storage::set_distribution_record(&env, 1, &player, &record);
+            Storage::set_distributed(&env, 1, &player);
+
+            // Simulate stale state: the record remains but the separate boolean flag disappears.
+            let dist_key = (symbol_short!("DIST"), 1u64, player.clone());
+            env.storage().persistent().remove(&dist_key);
 
             let status = RewardManager::get_distribution_status(env.clone(), 1, player.clone());
             assert!(status.distributed);
