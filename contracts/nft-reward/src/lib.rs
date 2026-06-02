@@ -86,10 +86,68 @@ pub struct NftReward;
 
 #[contractimpl]
 impl NftReward {
+    /// One-time setup: stores the admin, registers the first authorized minter, and
+    /// optionally caps total supply.  Must be called before minting on an initialized
+    /// contract; subsequent calls are rejected with `AlreadyInitialized`.
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        authorized_minter: Address,
+        max_supply: Option<u64>,
+    ) -> Result<(), crate::errors::NftErrorCode> {
+        if Storage::is_initialized(&env) {
+            return Err(crate::errors::NftErrorCode::AlreadyInitialized);
+        }
+        admin.require_auth();
+        Storage::save_admin(&env, &admin);
+        Storage::add_minter(&env, &authorized_minter);
+        Storage::save_max_supply(&env, max_supply);
+        Ok(())
+    }
+
+    /// Returns the stored admin address, or `None` if the contract is not yet initialized.
+    pub fn get_admin(env: Env) -> Option<Address> {
+        Storage::get_admin(&env)
+    }
+
+    /// Adds a new address to the minter whitelist.  Admin only.
+    pub fn add_minter(
+        env: Env,
+        admin: Address,
+        new_minter: Address,
+    ) -> Result<(), crate::errors::NftErrorCode> {
+        admin.require_auth();
+        let stored = Storage::get_admin(&env).ok_or(crate::errors::NftErrorCode::Unauthorized)?;
+        if admin != stored {
+            return Err(crate::errors::NftErrorCode::Unauthorized);
+        }
+        Storage::add_minter(&env, &new_minter);
+        Ok(())
+    }
+
+    /// Removes an address from the minter whitelist.  Admin only.
+    pub fn remove_minter(
+        env: Env,
+        admin: Address,
+        minter: Address,
+    ) -> Result<(), crate::errors::NftErrorCode> {
+        admin.require_auth();
+        let stored = Storage::get_admin(&env).ok_or(crate::errors::NftErrorCode::Unauthorized)?;
+        if admin != stored {
+            return Err(crate::errors::NftErrorCode::Unauthorized);
+        }
+        Storage::remove_minter(&env, &minter);
+        Ok(())
+    }
+
     /// Mints a unique NFT as a reward for hunt completion.
     ///
+    /// `minter` must be an authorized minter (and must sign the transaction) when the
+    /// contract has been initialized.  Before initialization the check is skipped so
+    /// that existing deployments remain functional.
+    ///
     /// # Arguments
-    /// * `env` - The Soroban environment
+    /// * `minter` - Address performing the mint (must be whitelisted after init)
     /// * `hunt_id` - The hunt this NFT commemorates
     /// * `player_address` - The address of the player completing the hunt (initial owner)
     /// * `metadata` - NFT metadata (title, description, image URI, hunt_title, rarity, tier)
@@ -98,10 +156,22 @@ impl NftReward {
     /// The unique NFT ID of the minted NFT
     pub fn mint_reward_nft(
         env: Env,
+        minter: Address,
         hunt_id: u64,
         player_address: Address,
         metadata: NftMetadata,
     ) -> u64 {
+        if Storage::is_initialized(&env) {
+            minter.require_auth();
+            if !Storage::is_minter(&env, &minter) {
+                panic!("unauthorized minter");
+            }
+            if let Some(max) = Storage::get_max_supply(&env) {
+                if Storage::get_nft_counter(&env) >= max {
+                    panic!("max supply reached");
+                }
+            }
+        }
         let minted_at = env.ledger().timestamp();
 
         let nft_id = Storage::next_nft_id(&env);
@@ -135,6 +205,9 @@ impl NftReward {
     /// used by cross-contract callers (e.g. RewardManager) that cannot depend
     /// on this crate's `NftMetadata` type directly.
     ///
+    /// `minter` is the calling contract's address and must be whitelisted when the
+    /// contract has been initialized.
+    ///
     /// Expected keys in `metadata` (all optional, with sensible defaults):
     /// - "title": String
     /// - "description": String
@@ -144,6 +217,7 @@ impl NftReward {
     /// - "tier": u32
     pub fn mint_reward_nft_from_map(
         env: Env,
+        minter: Address,
         hunt_id: u64,
         player_address: Address,
         metadata: Map<Symbol, Val>,
@@ -189,7 +263,7 @@ impl NftReward {
             tier,
         };
 
-        Self::mint_reward_nft(env, hunt_id, player_address, meta)
+        Self::mint_reward_nft(env, minter, hunt_id, player_address, meta)
     }
 
     /// Retrieves NFT data by ID.
