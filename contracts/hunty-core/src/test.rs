@@ -3476,4 +3476,160 @@ mod test {
         let amount = config.reward_per_winner();
         assert_eq!(amount, 2, "xlm_pool=7 / max_winners=3 must round down to 2");
     }
+
+    // ========== Ban System Tests ==========
+
+    /// Helper: create an active hunt with one required clue, return hunt_id.
+    fn setup_active_hunt(env: &Env, creator: &Address) -> u64 {
+        let hunt_id = HuntyCore::create_hunt(
+            env.clone(),
+            creator.clone(),
+            String::from_str(env, "Ban Test Hunt"),
+            String::from_str(env, "desc"),
+            None,
+            None,
+        )
+        .unwrap();
+        HuntyCore::add_clue(
+            env.clone(),
+            hunt_id,
+            String::from_str(env, "Q"),
+            String::from_str(env, "A"),
+            10,
+            true,
+        )
+        .unwrap();
+        HuntyCore::activate_hunt(env.clone(), hunt_id, creator.clone()).unwrap();
+        hunt_id
+    }
+
+    #[test]
+    fn test_ban_player_blocks_registration() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        env.mock_all_auths();
+
+        let creator = Address::generate(&env);
+        let player = Address::generate(&env);
+
+        with_core_contract(&env, |env, _| {
+            let hunt_id = setup_active_hunt(env, &creator);
+
+            HuntyCore::ban_player(env.clone(), hunt_id, creator.clone(), player.clone()).unwrap();
+
+            assert!(HuntyCore::is_player_banned(env.clone(), hunt_id, player.clone()));
+
+            let err = HuntyCore::register_player(env.clone(), hunt_id, player.clone())
+                .unwrap_err();
+            assert_eq!(err, HuntErrorCode::BannedPlayer);
+        });
+    }
+
+    #[test]
+    fn test_ban_player_blocks_answer_submission() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        env.mock_all_auths();
+
+        let creator = Address::generate(&env);
+        let player = Address::generate(&env);
+
+        with_core_contract(&env, |env, _| {
+            let hunt_id = setup_active_hunt(env, &creator);
+
+            // Register before banning so they have progress
+            HuntyCore::register_player(env.clone(), hunt_id, player.clone()).unwrap();
+
+            HuntyCore::ban_player(env.clone(), hunt_id, creator.clone(), player.clone()).unwrap();
+
+            let err = HuntyCore::submit_answer(
+                env.clone(),
+                hunt_id,
+                1,
+                player.clone(),
+                String::from_str(env, "A"),
+            )
+            .unwrap_err();
+            assert_eq!(err, HuntErrorCode::BannedPlayer);
+        });
+    }
+
+    #[test]
+    fn test_unban_player_restores_registration() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        env.mock_all_auths();
+
+        let creator = Address::generate(&env);
+        let player = Address::generate(&env);
+
+        with_core_contract(&env, |env, _| {
+            let hunt_id = setup_active_hunt(env, &creator);
+
+            HuntyCore::ban_player(env.clone(), hunt_id, creator.clone(), player.clone()).unwrap();
+            HuntyCore::unban_player(env.clone(), hunt_id, creator.clone(), player.clone())
+                .unwrap();
+
+            assert!(!HuntyCore::is_player_banned(env.clone(), hunt_id, player.clone()));
+
+            // Player should now be able to register
+            HuntyCore::register_player(env.clone(), hunt_id, player.clone()).unwrap();
+        });
+    }
+
+    #[test]
+    fn test_ban_player_unauthorized() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        env.mock_all_auths();
+
+        let creator = Address::generate(&env);
+        let non_creator = Address::generate(&env);
+        let player = Address::generate(&env);
+
+        with_core_contract(&env, |env, _| {
+            let hunt_id = setup_active_hunt(env, &creator);
+
+            let err =
+                HuntyCore::ban_player(env.clone(), hunt_id, non_creator.clone(), player.clone())
+                    .unwrap_err();
+            assert_eq!(err, HuntErrorCode::Unauthorized);
+        });
+    }
+
+    #[test]
+    fn test_unban_player_unauthorized() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        env.mock_all_auths();
+
+        let creator = Address::generate(&env);
+        let non_creator = Address::generate(&env);
+        let player = Address::generate(&env);
+
+        with_core_contract(&env, |env, _| {
+            let hunt_id = setup_active_hunt(env, &creator);
+            HuntyCore::ban_player(env.clone(), hunt_id, creator.clone(), player.clone()).unwrap();
+
+            let err =
+                HuntyCore::unban_player(env.clone(), hunt_id, non_creator.clone(), player.clone())
+                    .unwrap_err();
+            assert_eq!(err, HuntErrorCode::Unauthorized);
+        });
+    }
+
+    #[test]
+    fn test_ban_hunt_not_found() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let creator = Address::generate(&env);
+        let player = Address::generate(&env);
+
+        with_core_contract(&env, |env, _| {
+            let err = HuntyCore::ban_player(env.clone(), 999, creator.clone(), player.clone())
+                .unwrap_err();
+            assert_eq!(err, HuntErrorCode::HuntNotFound);
+        });
+    }
 }

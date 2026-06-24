@@ -19,6 +19,7 @@ impl Storage {
     const HUNT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CNTR");
     const CLUE_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CCNT");
     const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("RWDMGR");
+    const BAN_KEY: soroban_sdk::Symbol = symbol_short!("BAN");
 
     // ========== Hunt Storage Functions ==========
 
@@ -437,5 +438,23 @@ impl Storage {
 
     pub fn get_reward_manager(env: &Env) -> Option<Address> {
         env.storage().instance().get(&Self::REWARD_MGR_KEY)
+    }
+
+    // ========== Ban Storage Functions ==========
+
+    fn ban_key(hunt_id: u64, player: &Address) -> (soroban_sdk::Symbol, u64, Address) {
+        (Self::BAN_KEY, hunt_id, player.clone())
+    }
+
+    pub fn ban_player(env: &Env, hunt_id: u64, player: &Address) {
+        env.storage().persistent().set(&Self::ban_key(hunt_id, player), &());
+    }
+
+    pub fn unban_player(env: &Env, hunt_id: u64, player: &Address) {
+        env.storage().persistent().remove(&Self::ban_key(hunt_id, player));
+    }
+
+    pub fn is_banned(env: &Env, hunt_id: u64, player: &Address) -> bool {
+        env.storage().persistent().has(&Self::ban_key(hunt_id, player))
     }
 }

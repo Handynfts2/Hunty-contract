@@ -319,6 +319,20 @@ pub struct PlayerRegisteredEvent {
 
 #[contracttype]
 #[derive(Clone, Debug)]
+pub struct PlayerBannedEvent {
+    pub hunt_id: u64,
+    pub player: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct PlayerUnbannedEvent {
+    pub hunt_id: u64,
+    pub player: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
 pub struct AnswerIncorrectEvent {
     pub hunt_id: u64,
     pub player: Address,

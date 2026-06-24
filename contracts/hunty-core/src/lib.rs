@@ -6,8 +6,8 @@ use crate::storage::Storage;
 use crate::types::{
     AnswerIncorrectEvent, Clue, ClueAddedEvent, ClueCompletedEvent, ClueInfo, ClueRemovedEvent,
     Hunt, HuntActivatedEvent, HuntCancelledEvent, HuntCompletedEvent, HuntCreatedEvent,
-    HuntDeactivatedEvent, HuntStatistics, HuntStatus, LeaderboardEntry, PlayerProgress,
-    PlayerRegisteredEvent, RewardClaimedEvent, RewardConfig,
+    HuntDeactivatedEvent, HuntStatistics, HuntStatus, LeaderboardEntry, PlayerBannedEvent,
+    PlayerProgress, PlayerRegisteredEvent, PlayerUnbannedEvent, RewardClaimedEvent, RewardConfig,
 };
 use reward_manager::RewardErrorCode;
 use soroban_sdk::{
@@ -793,6 +793,10 @@ impl HuntyCore {
             return Err(HuntErrorCode::HuntNotActive);
         }
 
+        if Storage::is_banned(&env, hunt_id, &player) {
+            return Err(HuntErrorCode::BannedPlayer);
+        }
+
         if let Some(existing) = Storage::get_player_progress(&env, hunt_id, &player) {
             // Allow re-registration only if the existing progress is from a previous
             // activation cycle (i.e. the hunt was deactivated and reactivated since
@@ -888,6 +892,10 @@ impl HuntyCore {
         let current_time = env.ledger().timestamp();
         if !hunt.is_active(current_time) {
             return Err(HuntErrorCode::HuntNotActive);
+        }
+
+        if Storage::is_banned(&env, hunt_id, &player) {
+            return Err(HuntErrorCode::BannedPlayer);
         }
 
         let mut progress = Storage::get_player_progress(&env, hunt_id, &player)
@@ -1201,6 +1209,69 @@ impl HuntyCore {
             total_score_sum,
             average_score,
         })
+    }
+
+    /// Bans a player from a specific hunt. Only the hunt creator can ban players.
+    ///
+    /// A banned player cannot register or submit answers for the hunt.
+    pub fn ban_player(
+        env: Env,
+        hunt_id: u64,
+        caller: Address,
+        player: Address,
+    ) -> Result<(), HuntErrorCode> {
+        caller.require_auth();
+
+        let hunt = Storage::get_hunt(&env, hunt_id).ok_or(HuntErrorCode::HuntNotFound)?;
+
+        if hunt.creator != caller {
+            return Err(HuntErrorCode::Unauthorized);
+        }
+
+        Storage::ban_player(&env, hunt_id, &player);
+
+        env.events().publish(
+            (Symbol::new(&env, "PlayerBanned"), hunt_id),
+            PlayerBannedEvent {
+                hunt_id,
+                player: player.clone(),
+            },
+        );
+
+        Ok(())
+    }
+
+    /// Unbans a previously banned player from a specific hunt. Only the hunt creator can unban.
+    pub fn unban_player(
+        env: Env,
+        hunt_id: u64,
+        caller: Address,
+        player: Address,
+    ) -> Result<(), HuntErrorCode> {
+        caller.require_auth();
+
+        let hunt = Storage::get_hunt(&env, hunt_id).ok_or(HuntErrorCode::HuntNotFound)?;
+
+        if hunt.creator != caller {
+            return Err(HuntErrorCode::Unauthorized);
+        }
+
+        Storage::unban_player(&env, hunt_id, &player);
+
+        env.events().publish(
+            (Symbol::new(&env, "PlayerUnbanned"), hunt_id),
+            PlayerUnbannedEvent {
+                hunt_id,
+                player: player.clone(),
+            },
+        );
+
+        Ok(())
+    }
+
+    /// Returns whether a player is banned from a specific hunt.
+    pub fn is_player_banned(env: Env, hunt_id: u64, player: Address) -> bool {
+        Storage::is_banned(&env, hunt_id, &player)
     }
 }
 

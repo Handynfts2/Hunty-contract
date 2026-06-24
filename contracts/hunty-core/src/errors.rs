@@ -28,6 +28,7 @@ pub enum HuntErrorCode {
     NoRewardsConfigured = 21,
     NoRequiredClues = 22,
     InvalidRarity = 23,
+    BannedPlayer = 24,
 }
 
 #[derive(Debug)]
@@ -53,6 +54,7 @@ pub enum HuntError {
     NoRewardsConfigured { hunt_id: u64 },
     NoRequiredClues { hunt_id: u64 },
     InvalidRarity { value: u32 },
+    BannedPlayer { hunt_id: u64 },
 }
 
 impl fmt::Display for HuntError {
@@ -128,6 +130,9 @@ impl fmt::Display for HuntError {
             HuntError::InvalidRarity { value } => {
                 write!(f, "Invalid nft_rarity {}: must be 0-5", value)
             }
+            HuntError::BannedPlayer { hunt_id } => {
+                write!(f, "Player is banned from hunt {}", hunt_id)
+            }
         }
     }
 }
@@ -156,6 +161,7 @@ impl From<HuntError> for HuntErrorCode {
             HuntError::NoRewardsConfigured { .. } => HuntErrorCode::NoRewardsConfigured,
             HuntError::NoRequiredClues { .. } => HuntErrorCode::NoRequiredClues,
             HuntError::InvalidRarity { .. } => HuntErrorCode::InvalidRarity,
+            HuntError::BannedPlayer { .. } => HuntErrorCode::BannedPlayer,
         }
     }
 }
