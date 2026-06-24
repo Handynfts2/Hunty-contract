@@ -19,7 +19,7 @@ mod test {
 
     /// Runs a closure inside a registered HuntyCore contract context so storage is accessible.
     fn with_core_contract<T>(env: &Env, f: impl FnOnce(&Env, &Address) -> T) -> T {
-        let contract_id = env.register_contract(None, HuntyCore);
+        let contract_id = env.register(HuntyCore, ());
         env.as_contract(&contract_id, || f(env, &contract_id))
     }
 
@@ -1042,7 +1042,7 @@ mod test {
         let question = String::from_str(&env, "Valid question");
         let answer = String::from_str(&env, "a");
 
-        let core_id = env.register_contract(None, HuntyCore);
+        let core_id = env.register(HuntyCore, ());
         let (reward_manager_id, token_address, _) = setup_reward_manager(&env, None);
         let sac = token::StellarAssetClient::new(&env, &token_address);
         sac.mint(&creator, &5_000);
@@ -1457,7 +1457,7 @@ mod test {
     fn test_get_player_progress_returns_state_after_submit() {
         let env = Env::default();
         env.ledger().set_timestamp(1_700_000_000);
-        let contract_id = env.register_contract(None, HuntyCore);
+        let contract_id = env.register(HuntyCore, ());
         let creator = Address::generate(&env);
         let player = Address::generate(&env);
         let question = String::from_str(&env, "Q1");
@@ -1553,7 +1553,7 @@ mod test {
         let q2 = String::from_str(&env, "Q2");
         let a = String::from_str(&env, "a");
 
-        let contract_id = env.register_contract(None, HuntyCore);
+        let contract_id = env.register(HuntyCore, ());
         let hunt_id = as_core_contract(&env, &contract_id, |env| {
             HuntyCore::create_hunt(
                 env.clone(),
@@ -1648,7 +1648,7 @@ mod test {
         let question = String::from_str(&env, "Q");
         let answer = String::from_str(&env, "a");
 
-        let contract_id = env.register_contract(None, HuntyCore);
+        let contract_id = env.register(HuntyCore, ());
         let hunt_id = as_core_contract(&env, &contract_id, |env| {
             HuntyCore::create_hunt(
                 env.clone(),
@@ -1870,7 +1870,7 @@ mod test {
         let question = String::from_str(&env, "Q");
         let answer = String::from_str(&env, "a");
 
-        let contract_id = env.register_contract(None, HuntyCore);
+        let contract_id = env.register(HuntyCore, ());
         let hunt_id = as_core_contract(&env, &contract_id, |env| {
             HuntyCore::create_hunt(
                 env.clone(),
@@ -1951,7 +1951,7 @@ mod test {
         max_winners: u32,
         xlm_pool: i128,
     ) -> (u64, Address) {
-        let contract_id = env.register_contract(None, HuntyCore);
+        let contract_id = env.register(HuntyCore, ());
         let question = String::from_str(env, "What is 1+1?");
         let answer = String::from_str(env, "2");
 
@@ -2029,8 +2029,8 @@ mod test {
         let funder = Address::generate(&env);
 
         // Register contracts
-        let core_id = env.register_contract(None, HuntyCore);
-        let nft_contract_id = env.register_contract(None, NftReward);
+        let core_id = env.register(HuntyCore, ());
+        let nft_contract_id = env.register(NftReward, ());
 
         // Setup RewardManager with XLM token and default NFT contract
         let (reward_manager_id, token_address, token_admin) =
@@ -2215,8 +2215,8 @@ mod test {
         let funder = Address::generate(&env);
 
         // Register contracts
-        let core_id = env.register_contract(None, HuntyCore);
-        let nft_contract_id = env.register_contract(None, NftReward);
+        let core_id = env.register(HuntyCore, ());
+        let nft_contract_id = env.register(NftReward, ());
 
         // Setup RewardManager with XLM token and default NFT contract
         let (reward_manager_id, token_address, _) =
@@ -2367,7 +2367,7 @@ mod test {
         env.ledger().set_timestamp(1_700_000_000);
         let creator = Address::generate(&env);
         let player = Address::generate(&env);
-        let contract_id = env.register_contract(None, HuntyCore);
+        let contract_id = env.register(HuntyCore, ());
 
         // Create hunt with 2 required clues
         let hunt_id = as_core_contract(&env, &contract_id, |env| {
