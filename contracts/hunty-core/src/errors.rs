@@ -26,9 +26,6 @@ pub enum HuntErrorCode {
     RewardAlreadyClaimed = 19,
     RewardDistributionFailed = 20,
     NoRewardsConfigured = 21,
-    NoRequiredClues = 22,
-    InvalidRarity = 23,
-    BannedPlayer = 24,
 }
 
 #[derive(Debug)]
@@ -52,9 +49,6 @@ pub enum HuntError {
     RewardAlreadyClaimed { hunt_id: u64 },
     RewardDistributionFailed { hunt_id: u64 },
     NoRewardsConfigured { hunt_id: u64 },
-    NoRequiredClues { hunt_id: u64 },
-    InvalidRarity { value: u32 },
-    BannedPlayer { hunt_id: u64 },
 }
 
 impl fmt::Display for HuntError {
@@ -124,15 +118,6 @@ impl fmt::Display for HuntError {
             HuntError::NoRewardsConfigured { hunt_id } => {
                 write!(f, "No rewards configured for hunt {}", hunt_id)
             }
-            HuntError::NoRequiredClues { hunt_id } => {
-                write!(f, "Hunt {} has no required clues; at least one required clue must exist before activation", hunt_id)
-            }
-            HuntError::InvalidRarity { value } => {
-                write!(f, "Invalid nft_rarity {}: must be 0-5", value)
-            }
-            HuntError::BannedPlayer { hunt_id } => {
-                write!(f, "Player is banned from hunt {}", hunt_id)
-            }
         }
     }
 }
@@ -159,9 +144,6 @@ impl From<HuntError> for HuntErrorCode {
             HuntError::RewardAlreadyClaimed { .. } => HuntErrorCode::RewardAlreadyClaimed,
             HuntError::RewardDistributionFailed { .. } => HuntErrorCode::RewardDistributionFailed,
             HuntError::NoRewardsConfigured { .. } => HuntErrorCode::NoRewardsConfigured,
-            HuntError::NoRequiredClues { .. } => HuntErrorCode::NoRequiredClues,
-            HuntError::InvalidRarity { .. } => HuntErrorCode::InvalidRarity,
-            HuntError::BannedPlayer { .. } => HuntErrorCode::BannedPlayer,
         }
     }
 }
