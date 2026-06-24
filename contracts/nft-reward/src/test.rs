@@ -59,10 +59,10 @@ fn test_mint_reward_nft() {
 
     let nft_id = client.mint_reward_nft(&1, &player, &metadata);
 
-    assert_eq!(nft_id, 1);
+    assert!(nft_id > 0, "NFT ID must be non-zero");
 
     let nft = client.get_nft(&nft_id).unwrap();
-    assert_eq!(nft.nft_id, 1);
+    assert_eq!(nft.nft_id, nft_id);
     assert_eq!(nft.hunt_id, 1);
     assert_eq!(nft.owner, player);
     assert_eq!(nft.metadata.title, metadata.title);
@@ -86,9 +86,13 @@ fn test_nft_ids_are_unique() {
     let metadata3 = create_metadata(&env, "NFT 3", "Desc 3", "ipfs://3");
     let nft_id_3 = client.mint_reward_nft(&2, &player1, &metadata3);
 
-    assert_eq!(nft_id_1, 1);
-    assert_eq!(nft_id_2, 2);
-    assert_eq!(nft_id_3, 3);
+    // IDs must be non-zero and all distinct
+    assert!(nft_id_1 > 0);
+    assert!(nft_id_2 > 0);
+    assert!(nft_id_3 > 0);
+    assert_ne!(nft_id_1, nft_id_2);
+    assert_ne!(nft_id_2, nft_id_3);
+    assert_ne!(nft_id_1, nft_id_3);
 }
 
 #[test]
@@ -169,10 +173,13 @@ fn test_multiple_nfts_can_be_minted() {
     ];
     let uris = ["ipfs://hunt1", "ipfs://hunt2", "ipfs://hunt3", "ipfs://hunt4", "ipfs://hunt5"];
 
+    let mut ids = soroban_sdk::Vec::new(&env);
     for i in 0..5 {
         let metadata = create_metadata(&env, titles[i], descs[i], uris[i]);
         let nft_id = client.mint_reward_nft(&(i as u64 + 1), &player, &metadata);
-        assert_eq!(nft_id, (i as u64) + 1);
+        assert!(nft_id > 0, "NFT ID must be non-zero");
+        assert!(!ids.contains(nft_id), "NFT ID must be unique");
+        ids.push_back(nft_id);
     }
 
     assert_eq!(client.total_supply(), 5);
@@ -437,4 +444,70 @@ fn test_get_nft_owner_matches_owner_of() {
 
     assert_eq!(client.owner_of(&nft_id), client.get_nft_owner(&nft_id));
     assert_eq!(client.get_nft_owner(&nft_id), Some(player));
+}
+
+// ── PRNG / secure ID generation tests ────────────────────────────────────────
+
+/// NFT IDs must be non-zero (0 is the sentinel "no NFT").
+#[test]
+fn test_nft_id_is_nonzero() {
+    let env = setup_env();
+    let client = NftRewardClient::new(&env, &env.register_contract(None, NftReward));
+    let player = Address::generate(&env);
+    let metadata = create_metadata(&env, "T", "D", "ipfs://x");
+    let nft_id = client.mint_reward_nft(&1, &player, &metadata);
+    assert!(nft_id > 0);
+}
+
+/// Minting multiple NFTs in the same transaction produces distinct IDs.
+#[test]
+fn test_nft_ids_not_sequential() {
+    let env = setup_env();
+    let client = NftRewardClient::new(&env, &env.register_contract(None, NftReward));
+    let player = Address::generate(&env);
+
+    let mut ids = soroban_sdk::Vec::new(&env);
+    for i in 0..10u64 {
+        let meta = create_metadata(&env, "T", "D", "ipfs://x");
+        let id = client.mint_reward_nft(&i, &player, &meta);
+        assert!(id > 0, "id must be nonzero");
+        assert!(!ids.contains(id), "id must be unique across mints");
+        ids.push_back(id);
+    }
+
+    // IDs should not form a simple 1..=N sequence.
+    // With PRNG, the probability of all 10 being 1..=10 is negligibly small.
+    let sequential: bool = (0..ids.len()).all(|i| ids.get(i).unwrap() == i as u64 + 1);
+    assert!(!sequential, "IDs must not be sequential 1..N");
+}
+
+/// total_supply increments correctly even with random IDs.
+#[test]
+fn test_total_supply_tracks_mint_count_with_random_ids() {
+    let env = setup_env();
+    let client = NftRewardClient::new(&env, &env.register_contract(None, NftReward));
+    let player = Address::generate(&env);
+
+    assert_eq!(client.total_supply(), 0);
+    for i in 1..=5u64 {
+        let meta = create_metadata(&env, "T", "D", "ipfs://x");
+        client.mint_reward_nft(&i, &player, &meta);
+        assert_eq!(client.total_supply(), i);
+    }
+}
+
+/// Each minted NFT can be retrieved by its random ID.
+#[test]
+fn test_random_nft_id_can_be_retrieved() {
+    let env = setup_env();
+    let client = NftRewardClient::new(&env, &env.register_contract(None, NftReward));
+    let player = Address::generate(&env);
+    let meta = create_metadata(&env, "Retrieve", "Test", "ipfs://r");
+
+    let nft_id = client.mint_reward_nft(&42, &player, &meta);
+
+    let nft = client.get_nft(&nft_id).unwrap();
+    assert_eq!(nft.nft_id, nft_id);
+    assert_eq!(nft.hunt_id, 42);
+    assert_eq!(nft.owner, player);
 }

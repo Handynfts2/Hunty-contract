@@ -107,7 +107,7 @@ impl NftReward {
         }
         let minted_at = env.ledger().timestamp();
 
-        let nft_id = Storage::next_nft_id(&env);
+        let nft_id = Storage::gen_unique_nft_id(&env);
 
         let nft_data = NftData {
             nft_id,
@@ -120,6 +120,7 @@ impl NftReward {
 
         Storage::save_nft(&env, &nft_data);
         Storage::add_nft_to_owner(&env, &player_address, nft_id);
+        Storage::increment_nft_counter(&env);
 
         let event = NftMintedEvent {
             nft_id,
