@@ -17,6 +17,8 @@ export interface NftMetadata {
   hunt_title: string;
   rarity: number;
   tier: number;
+  creator?: string;
+  royalty_bps?: number;
 }
 
 export interface NftMetadataResponse {
@@ -31,6 +33,8 @@ export interface NftMetadataResponse {
   image_uri: string;
   rarity: number;
   tier: number;
+  creator?: string;
+  royalty_bps?: number;
 }
 
 export interface NftData {
@@ -39,12 +43,55 @@ export interface NftData {
   owner: string;
   completion_player: string;
   metadata: NftMetadata;
+  transferable: boolean;
   minted_at: bigint;
+}
+
+export interface AdminImageUrisUpdatedEvent {
+  old_prefix: string;
+  new_prefix: string;
+  updated_count: number;
 }
 
 export class Client extends ContractClient {
   constructor(public readonly options: ContractClientOptions) {
     super(new ContractSpec([]), options);
+  }
+
+  async initialize({
+    admin,
+    max_supply,
+  }: {
+    admin: string;
+    max_supply?: bigint;
+  }): Promise<AssembledTransaction<void>> {
+    return this.call("initialize", admin, max_supply);
+  }
+
+  async get_admin(): Promise<AssembledTransaction<string | undefined>> {
+    return this.call("get_admin");
+  }
+
+  async set_reward_manager({
+    admin,
+    reward_manager,
+  }: {
+    admin: string;
+    reward_manager: string;
+  }): Promise<AssembledTransaction<void>> {
+    return this.call("set_reward_manager", admin, reward_manager);
+  }
+
+  async admin_update_image_uris({
+    admin,
+    old_prefix,
+    new_prefix,
+  }: {
+    admin: string;
+    old_prefix: string;
+    new_prefix: string;
+  }): Promise<AssembledTransaction<number>> {
+    return this.call("admin_update_image_uris", admin, old_prefix, new_prefix);
   }
 
   async mint_reward_nft({
@@ -123,10 +170,24 @@ export class Client extends ContractClient {
 
   async get_player_nfts({
     owner,
+    offset,
+    limit,
   }: {
     owner: string;
+    offset: number;
+    limit: number;
   }): Promise<AssembledTransaction<bigint[]>> {
-    return this.call("get_player_nfts", owner);
+    return this.call("get_player_nfts", owner, offset, limit);
+  }
+
+  async burn({
+    nft_id,
+    owner,
+  }: {
+    nft_id: bigint;
+    owner: string;
+  }): Promise<AssembledTransaction<void>> {
+    return this.call("burn", nft_id, owner);
   }
 
   async transfer_nft({
@@ -139,5 +200,29 @@ export class Client extends ContractClient {
     to_address: string;
   }): Promise<AssembledTransaction<void>> {
     return this.call("transfer_nft", nft_id, from_address, to_address);
+  }
+
+  async add_minter({
+    admin,
+    minter,
+  }: {
+    admin: string;
+    minter: string;
+  }): Promise<AssembledTransaction<void>> {
+    return this.call("add_minter", admin, minter);
+  }
+
+  async remove_minter({
+    admin,
+    minter,
+  }: {
+    admin: string;
+    minter: string;
+  }): Promise<AssembledTransaction<void>> {
+    return this.call("remove_minter", admin, minter);
+  }
+
+  async contract_version(): Promise<AssembledTransaction<number>> {
+    return this.call("contract_version");
   }
 }

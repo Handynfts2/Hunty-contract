@@ -10,6 +10,8 @@ impl Storage {
     const OWNER_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("ONFC");
     const MAX_SUPPLY_KEY: soroban_sdk::Symbol = symbol_short!("MAXS");
     const INITIALIZED_KEY: soroban_sdk::Symbol = symbol_short!("INIT");
+    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMIN");
+    const MINTER_KEY: soroban_sdk::Symbol = symbol_short!("MINTR");
 
     fn nft_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
         (Self::NFT_KEY, nft_id)
@@ -43,7 +45,7 @@ impl Storage {
     // --- Admin / initialization ---
 
     pub fn is_initialized(env: &Env) -> bool {
-        env.storage().instance().has(&Self::ADMIN_KEY)
+        env.storage().persistent().has(&Self::INITIALIZED_KEY)
     }
 
     pub fn save_admin(env: &Env, admin: &Address) {
@@ -65,6 +67,16 @@ impl Storage {
 
     pub fn get_max_supply(env: &Env) -> Option<u64> {
         env.storage().instance().get(&Self::MAX_SUPPLY_KEY)
+    }
+
+    // --- Reward manager ---
+
+    pub fn save_reward_manager(env: &Env, reward_manager: &Address) {
+        env.storage().instance().set(&symbol_short!("RWRD"), reward_manager);
+    }
+
+    pub fn get_reward_manager(env: &Env) -> Option<Address> {
+        env.storage().instance().get(&symbol_short!("RWRD"))
     }
 
     // --- Minter whitelist ---
@@ -122,22 +134,6 @@ impl Storage {
     pub fn set_max_supply(env: &Env, max_supply: Option<u64>) {
         env.storage().persistent().set(&Self::MAX_SUPPLY_KEY, &max_supply);
         env.storage().persistent().set(&Self::INITIALIZED_KEY, &true);
-    }
-
-    /// Returns the configured max supply cap, if one has been stored.
-    pub fn get_max_supply(env: &Env) -> Option<u64> {
-        env.storage()
-            .persistent()
-            .get(&Self::MAX_SUPPLY_KEY)
-            .unwrap_or(None)
-    }
-
-    /// Returns whether the contract has been initialized.
-    pub fn is_initialized(env: &Env) -> bool {
-        env.storage()
-            .persistent()
-            .get(&Self::INITIALIZED_KEY)
-            .unwrap_or(false)
     }
 
     /// Adds an NFT ID to the owner's index.
