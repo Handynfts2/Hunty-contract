@@ -78,7 +78,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -99,7 +99,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ]
     ]
@@ -187,6 +187,14 @@
                   },
                   "val": {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "difficulty"
+                  },
+                  "val": {
+                    "u32": 1
                   }
                 },
                 {

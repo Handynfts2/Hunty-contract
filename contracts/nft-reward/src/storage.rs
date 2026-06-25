@@ -10,6 +10,9 @@ impl Storage {
     const OWNER_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("ONFC");
     const MAX_SUPPLY_KEY: soroban_sdk::Symbol = symbol_short!("MAXS");
     const INITIALIZED_KEY: soroban_sdk::Symbol = symbol_short!("INIT");
+    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMIN");
+    const MINTER_KEY: soroban_sdk::Symbol = symbol_short!("MINTER");
+    const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("RWDMGR");
 
     fn nft_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
         (Self::NFT_KEY, nft_id)
@@ -42,10 +45,6 @@ impl Storage {
 
     // --- Admin / initialization ---
 
-    pub fn is_initialized(env: &Env) -> bool {
-        env.storage().instance().has(&Self::ADMIN_KEY)
-    }
-
     pub fn save_admin(env: &Env, admin: &Address) {
         env.storage().instance().set(&Self::ADMIN_KEY, admin);
     }
@@ -63,8 +62,14 @@ impl Storage {
         }
     }
 
-    pub fn get_max_supply(env: &Env) -> Option<u64> {
-        env.storage().instance().get(&Self::MAX_SUPPLY_KEY)
+    // --- Reward Manager ---
+
+    pub fn set_reward_manager(env: &Env, address: &Address) {
+        env.storage().instance().set(&Self::REWARD_MGR_KEY, address);
+    }
+
+    pub fn get_reward_manager(env: &Env) -> Option<Address> {
+        env.storage().instance().get(&Self::REWARD_MGR_KEY)
     }
 
     // --- Minter whitelist ---

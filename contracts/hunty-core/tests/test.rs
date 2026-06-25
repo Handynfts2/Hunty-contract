@@ -27,11 +27,18 @@ fn test_cancel_hunt_with_reward_pool_refund() {
     env.ledger().set_timestamp(1_700_000_000);
 
     let creator = Address::generate(&env);
+    let admin = Address::generate(&env);
     let question = String::from_str(&env, "Valid question");
     let answer = String::from_str(&env, "a");
 
     let core_id = env.register_contract(None, HuntyCore);
     let (reward_manager_id, token_address) = setup_reward_manager(&env);
+
+    // Initialize admin
+    env.mock_all_auths();
+    as_core_contract(&env, &core_id, |env| {
+        HuntyCore::initialize_admin(env.clone(), admin.clone()).unwrap();
+    });
 
     // Mint tokens to creator
     let sac = token::StellarAssetClient::new(&env, &token_address);
@@ -50,9 +57,9 @@ fn test_cancel_hunt_with_reward_pool_refund() {
             None,
         )
         .unwrap();
-        HuntyCore::add_clue(env.clone(), hunt_id, question, answer, 1, true).unwrap();
+        HuntyCore::add_clue(env.clone(), hunt_id, question, answer, 1, true, 1).unwrap();
         HuntyCore::activate_hunt(env.clone(), hunt_id, creator.clone()).unwrap();
-        HuntyCore::set_reward_manager(env.clone(), reward_manager_id.clone()).unwrap();
+        HuntyCore::set_reward_manager(env.clone(), admin.clone(), reward_manager_id.clone()).unwrap();
         hunt_id
     });
 

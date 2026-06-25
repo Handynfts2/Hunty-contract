@@ -23,14 +23,18 @@ pub enum HuntErrorCode {
     TooManyClues = 16,
     InvalidQuestion = 17,
     RefundFailed = 18,
-    NoCluesAdded = 17,
-    HuntNotCompleted = 18,
-    RewardAlreadyClaimed = 19,
-    RewardDistributionFailed = 20,
-    NoRewardsConfigured = 21,
-    NoRequiredClues = 22,
-    InvalidRarity = 23,
-    InvalidTimeBonusConfig = 24,
+    NoCluesAdded = 19,
+    HuntNotCompleted = 20,
+    RewardAlreadyClaimed = 21,
+    RewardDistributionFailed = 22,
+    NoRewardsConfigured = 23,
+    NoRequiredClues = 24,
+    InvalidRarity = 25,
+    InvalidTimeBonusConfig = 26,
+    InvalidEndTime = 27,
+    ContractPaused = 28,
+    InvalidDifficulty = 29,
+    InvalidPoints = 30,
 }
 
 #[derive(Debug)]
@@ -59,6 +63,7 @@ pub enum HuntError {
     NoRequiredClues { hunt_id: u64 },
     InvalidRarity { value: u32 },
     InvalidTimeBonusConfig,
+    InvalidEndTime,
 }
 
 impl fmt::Display for HuntError {
@@ -143,6 +148,9 @@ impl fmt::Display for HuntError {
             HuntError::InvalidTimeBonusConfig => {
                 write!(f, "Invalid time bonus configuration")
             }
+            HuntError::InvalidRarity { value } => {
+                write!(f, "Invalid rarity value: {}", value)
+            }
         }
     }
 }
@@ -174,6 +182,7 @@ impl From<HuntError> for HuntErrorCode {
             HuntError::NoRequiredClues { .. } => HuntErrorCode::NoRequiredClues,
             HuntError::InvalidRarity { .. } => HuntErrorCode::InvalidRarity,
             HuntError::InvalidTimeBonusConfig => HuntErrorCode::InvalidTimeBonusConfig,
+            HuntError::InvalidEndTime => HuntErrorCode::InvalidEndTime,
         }
     }
 }

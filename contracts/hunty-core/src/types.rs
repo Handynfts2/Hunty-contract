@@ -50,7 +50,7 @@ pub struct Hunt {
     pub activated_at: u64,
     pub start_time: u64,
     pub end_time: u64,
-    pub reward_config: RewardConfig,
+    pub reward_config: HuntRewardConfig,
     pub time_bonus_start_bps: Option<u32>,
     pub time_bonus_min_bps: Option<u32>,
     pub time_bonus_decay_secs: Option<u64>,
@@ -70,7 +70,7 @@ pub struct Clue {
     pub points: u32,
     pub is_required: bool,
     /// Difficulty multiplier (1-10). Points earned = points * difficulty.
-    pub difficulty: u8,
+    pub difficulty: u32,
 }
 
 /// Clue info returned by get_clue/list_clues. Excludes answer hash.
@@ -82,7 +82,7 @@ pub struct ClueInfo {
     pub points: u32,
     pub is_required: bool,
     /// Difficulty multiplier (1-10).
-    pub difficulty: u8,
+    pub difficulty: u32,
 }
 
 #[contracttype]
@@ -137,7 +137,6 @@ pub struct StoredPlayerProgress {
     pub completed_at: u64,
     pub is_completed: bool,
     pub reward_claimed: bool,
-    pub clue_attempts: Map<u32, u32>,
 }
 
 /// Public view of player progress, with `player` and `hunt_id` reconstructed from the key.
@@ -150,7 +149,6 @@ pub struct PlayerProgress {
     pub completed_clue_index: Map<u32, bool>,
     pub required_completed_count: u32,
     pub total_score: u32,
-    pub required_completed_count: u32,
     pub started_at: u64,
     pub completed_at: u64,
     pub is_completed: bool,
@@ -167,7 +165,6 @@ impl PlayerProgress {
             completed_clue_index: Map::new(env),
             required_completed_count: 0,
             total_score: 0,
-            required_completed_count: 0,
             started_at: current_time,
             completed_at: 0,
             is_completed: false,
@@ -187,7 +184,6 @@ impl PlayerProgress {
             completed_at: self.completed_at,
             is_completed: self.is_completed,
             reward_claimed: self.reward_claimed,
-            clue_attempts: self.clue_attempts.clone(),
         }
     }
 
@@ -211,7 +207,6 @@ impl PlayerProgress {
             completed_clue_index,
             required_completed_count: stored.required_completed_count,
             total_score: stored.total_score,
-            required_completed_count: stored.required_completed_count,
             started_at: stored.started_at,
             completed_at: stored.completed_at,
             is_completed: stored.is_completed,
@@ -241,6 +236,14 @@ impl PlayerProgress {
         let next = current + 1;
         self.clue_attempts.set(clue_id, next);
         next
+    }
+
+    pub fn failed_attempts_for_clue(&self, clue_id: u32) -> u32 {
+        self.clue_attempts.get(clue_id).unwrap_or(0)
+    }
+
+    pub fn record_failed_attempt(&mut self, clue_id: u32) -> u32 {
+        self.record_attempt(clue_id)
     }
 }
 
@@ -419,7 +422,7 @@ pub struct ClueAddedEvent {
     pub points: u32,
     pub is_required: bool,
     /// Difficulty multiplier (1-10).
-    pub difficulty: u8,
+    pub difficulty: u32,
 }
 
 /// Emitted when a player registers for an active hunt.
@@ -489,4 +492,20 @@ pub struct HuntStatistics {
     pub completion_rate_percent: u32,
     pub total_score_sum: u64,
     pub average_score: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct ClueAliasesAddedEvent {
+    pub hunt_id: u64,
+    pub clue_id: u32,
+    pub creator: Address,
+    pub aliases_count: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct RewardManagerSetEvent {
+    pub old_address: Option<Address>,
+    pub new_address: Address,
 }

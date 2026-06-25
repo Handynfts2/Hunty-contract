@@ -284,7 +284,7 @@
             },
             "ext": "v0"
           },
-          4095
+          1555200
         ]
       ],
       [
@@ -333,7 +333,7 @@
             },
             "ext": "v0"
           },
-          4095
+          1555200
         ]
       ],
       [
@@ -384,7 +384,7 @@
             },
             "ext": "v0"
           },
-          4095
+          1555200
         ]
       ],
       [
@@ -440,102 +440,6 @@
                     },
                     {
                       "key": {
-                        "symbol": "completed_clues"
-                      },
-                      "val": {
-                        "vec": [
-                          {
-                            "u32": 1
-                          }
-                        ]
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "is_completed"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "reward_claimed"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "started_at"
-                      },
-                      "val": {
-                        "u64": 1700000000
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "total_score"
-                      },
-                      "val": {
-                        "u32": 10
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "PROG"
-                },
-                {
-                  "u64": 1
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "PROG"
-                    },
-                    {
-                      "u64": 1
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
                         "symbol": "completed_at"
                       },
                       "val": {
@@ -564,6 +468,14 @@
                     },
                     {
                       "key": {
+                        "symbol": "required_completed_count"
+                      },
+                      "val": {
+                        "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "reward_claimed"
                       },
                       "val": {
@@ -592,7 +504,7 @@
             },
             "ext": "v0"
           },
-          4095
+          1555200
         ]
       ],
       [
@@ -728,6 +640,14 @@
                             },
                             {
                               "key": {
+                                "symbol": "difficulty"
+                              },
+                              "val": {
+                                "u32": 1
+                              }
+                            },
+                            {
+                              "key": {
                                 "symbol": "is_required"
                               },
                               "val": {
@@ -816,6 +736,14 @@
                             },
                             {
                               "key": {
+                                "symbol": "max_attempts_per_clue"
+                              },
+                              "val": {
+                                "u32": 5
+                              }
+                            },
+                            {
+                              "key": {
                                 "symbol": "required_clues"
                               },
                               "val": {
@@ -838,6 +766,75 @@
                                   },
                                   {
                                     "key": {
+                                      "symbol": "distribution_config"
+                                    },
+                                    "val": {
+                                      "map": [
+                                        {
+                                          "key": {
+                                            "symbol": "nft_contract"
+                                          },
+                                          "val": "void"
+                                        },
+                                        {
+                                          "key": {
+                                            "symbol": "nft_description"
+                                          },
+                                          "val": {
+                                            "string": ""
+                                          }
+                                        },
+                                        {
+                                          "key": {
+                                            "symbol": "nft_hunt_title"
+                                          },
+                                          "val": {
+                                            "string": ""
+                                          }
+                                        },
+                                        {
+                                          "key": {
+                                            "symbol": "nft_image_uri"
+                                          },
+                                          "val": {
+                                            "string": ""
+                                          }
+                                        },
+                                        {
+                                          "key": {
+                                            "symbol": "nft_rarity"
+                                          },
+                                          "val": {
+                                            "u32": 0
+                                          }
+                                        },
+                                        {
+                                          "key": {
+                                            "symbol": "nft_tier"
+                                          },
+                                          "val": {
+                                            "u32": 0
+                                          }
+                                        },
+                                        {
+                                          "key": {
+                                            "symbol": "nft_title"
+                                          },
+                                          "val": {
+                                            "string": ""
+                                          }
+                                        },
+                                        {
+                                          "key": {
+                                            "symbol": "xlm_amount"
+                                          },
+                                          "val": "void"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "key": {
                                       "symbol": "max_winners"
                                     },
                                     "val": {
@@ -846,32 +843,10 @@
                                   },
                                   {
                                     "key": {
-                                      "symbol": "nft_contract"
-                                    },
-                                    "val": "void"
-                                  },
-                                  {
-                                    "key": {
                                       "symbol": "nft_enabled"
                                     },
                                     "val": {
                                       "bool": false
-                                    }
-                                  },
-                                  {
-                                    "key": {
-                                      "symbol": "nft_rarity"
-                                    },
-                                    "val": {
-                                      "u32": 0
-                                    }
-                                  },
-                                  {
-                                    "key": {
-                                      "symbol": "nft_tier"
-                                    },
-                                    "val": {
-                                      "u32": 0
                                     }
                                   },
                                   {
@@ -910,6 +885,24 @@
                             },
                             {
                               "key": {
+                                "symbol": "time_bonus_decay_secs"
+                              },
+                              "val": "void"
+                            },
+                            {
+                              "key": {
+                                "symbol": "time_bonus_min_bps"
+                              },
+                              "val": "void"
+                            },
+                            {
+                              "key": {
+                                "symbol": "time_bonus_start_bps"
+                              },
+                              "val": "void"
+                            },
+                            {
+                              "key": {
                                 "symbol": "title"
                               },
                               "val": {
@@ -934,7 +927,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -955,7 +948,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ]
     ]
