@@ -934,6 +934,191 @@ impl HuntyCore {
             average_score,
         })
     }
+
+    /// Adds an address to the view-only access list for a specific hunt.
+    /// View-only addresses can read hunt data but cannot modify it.
+    /// Only the hunt creator can add view-only addresses.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `hunt_id` - The hunt to grant view-only access for
+    /// * `creator` - The hunt creator (must authorize)
+    /// * `viewer` - The address to grant view-only access
+    ///
+    /// # Errors
+    /// * `HuntNotFound` - Hunt does not exist
+    /// * `Unauthorized` - Caller is not the hunt creator
+    pub fn add_view_only_access(
+        env: Env,
+        hunt_id: u64,
+        creator: Address,
+        viewer: Address,
+    ) -> Result<(), HuntErrorCode> {
+        creator.require_auth();
+
+        let hunt = Storage::get_hunt(&env, hunt_id).ok_or(HuntErrorCode::HuntNotFound)?;
+
+        if hunt.creator != creator {
+            return Err(HuntErrorCode::Unauthorized);
+        }
+
+        Storage::add_view_only(&env, hunt_id, &viewer);
+        Ok(())
+    }
+
+    /// Removes an address from the view-only access list for a specific hunt.
+    /// Only the hunt creator can remove view-only addresses.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `hunt_id` - The hunt to revoke view-only access for
+    /// * `creator` - The hunt creator (must authorize)
+    /// * `viewer` - The address to revoke view-only access
+    ///
+    /// # Errors
+    /// * `HuntNotFound` - Hunt does not exist
+    /// * `Unauthorized` - Caller is not the hunt creator
+    pub fn remove_view_only_access(
+        env: Env,
+        hunt_id: u64,
+        creator: Address,
+        viewer: Address,
+    ) -> Result<(), HuntErrorCode> {
+        creator.require_auth();
+
+        let hunt = Storage::get_hunt(&env, hunt_id).ok_or(HuntErrorCode::HuntNotFound)?;
+
+        if hunt.creator != creator {
+            return Err(HuntErrorCode::Unauthorized);
+        }
+
+        Storage::remove_view_only(&env, hunt_id, &viewer);
+        Ok(())
+    }
+
+    /// Checks if an address has view-only access for a specific hunt.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `hunt_id` - The hunt to check view-only access for
+    /// * `address` - The address to check
+    ///
+    /// # Returns
+    /// `true` if the address has view-only access, `false` otherwise
+    pub fn is_view_only(env: Env, hunt_id: u64, address: Address) -> bool {
+        Storage::is_view_only(&env, hunt_id, &address)
+    }
+
+    /// Gets all view-only addresses for a specific hunt.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `hunt_id` - The hunt to get view-only addresses for
+    ///
+    /// # Returns
+    /// A vector of all addresses with view-only access for the hunt
+    pub fn get_view_only_list(env: Env, hunt_id: u64) -> Vec<Address> {
+        Storage::get_view_only_list(&env, hunt_id)
+    }
+
+    /// Initializes the contract with an admin address.
+    /// The admin can manage global view-only access.
+    /// Can only be called once.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `admin` - The admin address (must authorize)
+    ///
+    /// # Errors
+    /// * `Unauthorized` - Admin already set
+    pub fn initialize_admin(env: Env, admin: Address) -> Result<(), HuntErrorCode> {
+        admin.require_auth();
+
+        if Storage::get_admin(&env).is_some() {
+            return Err(HuntErrorCode::Unauthorized);
+        }
+
+        Storage::set_admin(&env, &admin);
+        Ok(())
+    }
+
+    /// Adds an address to the global view-only list.
+    /// Global view-only addresses can read ALL hunt data.
+    /// Only the contract admin can add global view-only addresses.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `admin` - The contract admin (must authorize)
+    /// * `viewer` - The address to grant global view-only access
+    ///
+    /// # Errors
+    /// * `Unauthorized` - Caller is not the admin or admin not set
+    pub fn add_global_view_only(
+        env: Env,
+        admin: Address,
+        viewer: Address,
+    ) -> Result<(), HuntErrorCode> {
+        admin.require_auth();
+
+        let configured_admin = Storage::get_admin(&env).ok_or(HuntErrorCode::Unauthorized)?;
+
+        if configured_admin != admin {
+            return Err(HuntErrorCode::Unauthorized);
+        }
+
+        Storage::add_global_view_only(&env, &viewer);
+        Ok(())
+    }
+
+    /// Removes an address from the global view-only list.
+    /// Only the contract admin can remove global view-only addresses.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `admin` - The contract admin (must authorize)
+    /// * `viewer` - The address to revoke global view-only access
+    ///
+    /// # Errors
+    /// * `Unauthorized` - Caller is not the admin or admin not set
+    pub fn remove_global_view_only(
+        env: Env,
+        admin: Address,
+        viewer: Address,
+    ) -> Result<(), HuntErrorCode> {
+        admin.require_auth();
+
+        let configured_admin = Storage::get_admin(&env).ok_or(HuntErrorCode::Unauthorized)?;
+
+        if configured_admin != admin {
+            return Err(HuntErrorCode::Unauthorized);
+        }
+
+        Storage::remove_global_view_only(&env, &viewer);
+        Ok(())
+    }
+
+    /// Checks if an address has global view-only access.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    /// * `address` - The address to check
+    ///
+    /// # Returns
+    /// `true` if the address has global view-only access, `false` otherwise
+    pub fn is_global_view_only(env: Env, address: Address) -> bool {
+        Storage::is_global_view_only(&env, &address)
+    }
+
+    /// Gets all global view-only addresses.
+    ///
+    /// # Arguments
+    /// * `env` - The Soroban environment
+    ///
+    /// # Returns
+    /// A vector of all addresses with global view-only access
+    pub fn get_global_view_only_list(env: Env) -> Vec<Address> {
+        Storage::get_global_view_only_list(&env)
+    }
 }
 
 mod errors;

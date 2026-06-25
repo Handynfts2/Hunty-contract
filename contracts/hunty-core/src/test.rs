@@ -2824,4 +2824,389 @@ mod test {
         });
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_add_view_only_access_success() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        let (hunt_id, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Add view-only access
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer.clone())
+        });
+        assert!(result.is_ok());
+
+        // Verify viewer is in the list for this hunt
+        let view_only_list = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::get_view_only_list(env.clone(), hunt_id)
+        });
+        assert_eq!(view_only_list.len(), 1);
+        assert_eq!(view_only_list.get(0).unwrap(), viewer);
+    }
+
+    #[test]
+    fn test_add_view_only_access_unauthorized() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+        let attacker = Address::generate(&env);
+
+        let (hunt_id, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Try to add view-only access as non-creator
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, attacker.clone(), viewer.clone())
+        });
+        assert_eq!(result, Err(HuntErrorCode::Unauthorized));
+    }
+
+    #[test]
+    fn test_add_view_only_access_hunt_not_found() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        let contract_id = env.register_contract(None, HuntyCore);
+
+        // Try to add view-only access for non-existent hunt
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), 999, creator.clone(), viewer.clone())
+        });
+        assert_eq!(result, Err(HuntErrorCode::HuntNotFound));
+    }
+
+    #[test]
+    fn test_remove_view_only_access_success() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        let (hunt_id, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Add view-only access
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer.clone()).unwrap();
+        });
+
+        // Verify viewer is in the list
+        let view_only_list = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::get_view_only_list(env.clone(), hunt_id)
+        });
+        assert_eq!(view_only_list.len(), 1);
+
+        // Remove view-only access
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::remove_view_only_access(env.clone(), hunt_id, creator.clone(), viewer.clone())
+        });
+        assert!(result.is_ok());
+
+        // Verify viewer is removed
+        let view_only_list = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::get_view_only_list(env.clone(), hunt_id)
+        });
+        assert_eq!(view_only_list.len(), 0);
+    }
+
+    #[test]
+    fn test_remove_view_only_access_unauthorized() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+        let attacker = Address::generate(&env);
+
+        let (hunt_id, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Add view-only access
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer.clone()).unwrap();
+        });
+
+        // Try to remove view-only access as non-creator
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::remove_view_only_access(env.clone(), hunt_id, attacker.clone(), viewer.clone())
+        });
+        assert_eq!(result, Err(HuntErrorCode::Unauthorized));
+    }
+
+    #[test]
+    fn test_is_view_only() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+        let non_viewer = Address::generate(&env);
+
+        let (hunt_id, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Add view-only access
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer.clone()).unwrap();
+        });
+
+        // Check if viewer has view-only access for this hunt
+        let is_viewer = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_view_only(env.clone(), hunt_id, viewer.clone())
+        });
+        assert!(is_viewer);
+
+        // Check if non-viewer does not have view-only access
+        let is_non_viewer = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_view_only(env.clone(), hunt_id, non_viewer.clone())
+        });
+        assert!(!is_non_viewer);
+    }
+
+    #[test]
+    fn test_add_duplicate_view_only_address() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        let (hunt_id, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Add view-only access twice
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer.clone()).unwrap();
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer.clone()).unwrap();
+        });
+
+        // Verify viewer appears only once
+        let view_only_list = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::get_view_only_list(env.clone(), hunt_id)
+        });
+        assert_eq!(view_only_list.len(), 1);
+    }
+
+    #[test]
+    fn test_multiple_view_only_addresses() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer1 = Address::generate(&env);
+        let viewer2 = Address::generate(&env);
+        let viewer3 = Address::generate(&env);
+
+        let (hunt_id, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Add multiple view-only addresses
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer1.clone()).unwrap();
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer2.clone()).unwrap();
+            HuntyCore::add_view_only_access(env.clone(), hunt_id, creator.clone(), viewer3.clone()).unwrap();
+        });
+
+        // Verify all viewers are in the list
+        let view_only_list = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::get_view_only_list(env.clone(), hunt_id)
+        });
+        assert_eq!(view_only_list.len(), 3);
+    }
+
+    #[test]
+    fn test_view_only_is_per_hunt() {
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let creator = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        let (hunt_id1, contract_id) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+        let (hunt_id2, _) = setup_completed_hunt_with_rewards(&env, &creator, &creator, 5, 1000);
+
+        // Add view-only access to hunt 1
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_view_only_access(env.clone(), hunt_id1, creator.clone(), viewer.clone()).unwrap();
+        });
+
+        // Verify viewer has access to hunt 1
+        let has_access_hunt1 = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_view_only(env.clone(), hunt_id1, viewer.clone())
+        });
+        assert!(has_access_hunt1);
+
+        // Verify viewer does NOT have access to hunt 2
+        let has_access_hunt2 = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_view_only(env.clone(), hunt_id2, viewer.clone())
+        });
+        assert!(!has_access_hunt2);
+    }
+
+    #[test]
+    fn test_initialize_admin_success() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, HuntyCore);
+        let admin = Address::generate(&env);
+
+        // Initialize admin
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::initialize_admin(env.clone(), admin.clone())
+        });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_initialize_admin_already_set() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, HuntyCore);
+        let admin1 = Address::generate(&env);
+        let admin2 = Address::generate(&env);
+
+        // Initialize admin first time
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::initialize_admin(env.clone(), admin1.clone()).unwrap();
+        });
+
+        // Try to initialize admin again
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::initialize_admin(env.clone(), admin2.clone())
+        });
+        assert_eq!(result, Err(HuntErrorCode::Unauthorized));
+    }
+
+    #[test]
+    fn test_add_global_view_only_success() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, HuntyCore);
+        let admin = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        // Initialize admin
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::initialize_admin(env.clone(), admin.clone()).unwrap();
+        });
+
+        // Add global view-only access
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_global_view_only(env.clone(), admin.clone(), viewer.clone())
+        });
+        assert!(result.is_ok());
+
+        // Verify viewer has global view-only access
+        let is_global_viewer = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_global_view_only(env.clone(), viewer.clone())
+        });
+        assert!(is_global_viewer);
+    }
+
+    #[test]
+    fn test_add_global_view_only_unauthorized() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, HuntyCore);
+        let admin = Address::generate(&env);
+        let viewer = Address::generate(&env);
+        let attacker = Address::generate(&env);
+
+        // Initialize admin
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::initialize_admin(env.clone(), admin.clone()).unwrap();
+        });
+
+        // Try to add global view-only access as non-admin
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_global_view_only(env.clone(), attacker.clone(), viewer.clone())
+        });
+        assert_eq!(result, Err(HuntErrorCode::Unauthorized));
+    }
+
+    #[test]
+    fn test_add_global_view_only_admin_not_set() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, HuntyCore);
+        let admin = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        // Try to add global view-only access without initializing admin
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_global_view_only(env.clone(), admin.clone(), viewer.clone())
+        });
+        assert_eq!(result, Err(HuntErrorCode::Unauthorized));
+    }
+
+    #[test]
+    fn test_remove_global_view_only_success() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, HuntyCore);
+        let admin = Address::generate(&env);
+        let viewer = Address::generate(&env);
+
+        // Initialize admin
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::initialize_admin(env.clone(), admin.clone()).unwrap();
+        });
+
+        // Add global view-only access
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_global_view_only(env.clone(), admin.clone(), viewer.clone()).unwrap();
+        });
+
+        // Remove global view-only access
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::remove_global_view_only(env.clone(), admin.clone(), viewer.clone())
+        });
+        assert!(result.is_ok());
+
+        // Verify viewer no longer has global view-only access
+        let is_global_viewer = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_global_view_only(env.clone(), viewer.clone())
+        });
+        assert!(!is_global_viewer);
+    }
+
+    #[test]
+    fn test_get_global_view_only_list() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, HuntyCore);
+        let admin = Address::generate(&env);
+        let viewer1 = Address::generate(&env);
+        let viewer2 = Address::generate(&env);
+
+        // Initialize admin
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::initialize_admin(env.clone(), admin.clone()).unwrap();
+        });
+
+        // Add multiple global view-only addresses
+        env.mock_all_auths();
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::add_global_view_only(env.clone(), admin.clone(), viewer1.clone()).unwrap();
+            HuntyCore::add_global_view_only(env.clone(), admin.clone(), viewer2.clone()).unwrap();
+        });
+
+        // Get global view-only list
+        let global_view_only_list = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::get_global_view_only_list(env.clone())
+        });
+        assert_eq!(global_view_only_list.len(), 2);
+    }
 }
