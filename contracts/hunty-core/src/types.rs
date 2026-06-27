@@ -318,3 +318,19 @@ pub struct HuntStatistics {
     pub total_score_sum: u64,
     pub average_score: u32,
 }
+
+/// Emitted when an admin blacklists a creator address.
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct CreatorBlacklistedEvent {
+    pub creator: Address,
+    pub admin: Address,
+}
+
+/// Emitted when an admin removes a creator from the blacklist.
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct CreatorRemovedFromBlacklistEvent {
+    pub creator: Address,
+    pub admin: Address,
+}

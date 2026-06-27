@@ -1350,7 +1350,7 @@ mod test {
                 HuntyCore::register_player(env.clone(), hunt_id, player.clone()).unwrap_err();
             assert_eq!(err, HuntErrorCode::DuplicateRegistration);
 
-            Ok(())
+            Ok::<(), HuntErrorCode>(())
         });
     }
 
@@ -2723,5 +2723,133 @@ mod test {
             HuntyCore::complete_hunt(env.clone(), hunt_id, player.clone())
         });
         assert_eq!(result, Err(HuntErrorCode::InvalidHuntStatus));
+    }
+
+    // ========== Blacklist Tests ==========
+
+    #[test]
+    fn test_set_admin_and_blacklist_creator() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let contract_id = env.register_contract(None, HuntyCore);
+
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::set_admin(env.clone(), admin.clone());
+        });
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::blacklist_creator(env.clone(), admin.clone(), creator.clone()).unwrap();
+        });
+        let blacklisted = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_blacklisted(env.clone(), creator.clone())
+        });
+        assert!(blacklisted);
+    }
+
+    #[test]
+    fn test_remove_from_blacklist() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let contract_id = env.register_contract(None, HuntyCore);
+
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::set_admin(env.clone(), admin.clone());
+        });
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::blacklist_creator(env.clone(), admin.clone(), creator.clone()).unwrap();
+        });
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::remove_from_blacklist(env.clone(), admin.clone(), creator.clone()).unwrap();
+        });
+        let blacklisted = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::is_blacklisted(env.clone(), creator.clone())
+        });
+        assert!(!blacklisted);
+    }
+
+    #[test]
+    fn test_blacklisted_creator_cannot_create_hunt() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let contract_id = env.register_contract(None, HuntyCore);
+
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::set_admin(env.clone(), admin.clone());
+        });
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::blacklist_creator(env.clone(), admin.clone(), creator.clone()).unwrap();
+        });
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::create_hunt(
+                env.clone(),
+                creator.clone(),
+                String::from_str(env, "Test Hunt"),
+                String::from_str(env, "Description"),
+                None,
+                None,
+            )
+        });
+        assert_eq!(result, Err(HuntErrorCode::CreatorBlacklisted));
+    }
+
+    #[test]
+    fn test_non_blacklisted_creator_can_create_hunt() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let other = Address::generate(&env);
+        let contract_id = env.register_contract(None, HuntyCore);
+
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::set_admin(env.clone(), admin.clone());
+        });
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::blacklist_creator(env.clone(), admin.clone(), creator.clone()).unwrap();
+        });
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::create_hunt(
+                env.clone(),
+                other.clone(),
+                String::from_str(env, "Hunt by Other"),
+                String::from_str(env, "Description"),
+                None,
+                None,
+            )
+        });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_blacklist_non_admin_unauthorized() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let not_admin = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let contract_id = env.register_contract(None, HuntyCore);
+
+        as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::set_admin(env.clone(), admin.clone());
+        });
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::blacklist_creator(env.clone(), not_admin.clone(), creator.clone())
+        });
+        assert_eq!(result, Err(HuntErrorCode::Unauthorized));
+    }
+
+    #[test]
+    fn test_is_blacklisted_false_by_default() {
+        let env = Env::default();
+        let creator = Address::generate(&env);
+        let result = with_core_contract(&env, |env, _cid| {
+            HuntyCore::is_blacklisted(env.clone(), creator.clone())
+        });
+        assert!(!result);
     }
 }

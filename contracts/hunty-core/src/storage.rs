@@ -19,6 +19,8 @@ impl Storage {
     const HUNT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CNTR");
     const CLUE_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CCNT");
     const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("RWDMGR");
+    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMIN");
+    const BLACKLIST_KEY: soroban_sdk::Symbol = symbol_short!("BLKLST");
 
     // ========== Hunt Storage Functions ==========
 
@@ -391,5 +393,40 @@ impl Storage {
 
     pub fn get_reward_manager(env: &Env) -> Option<Address> {
         env.storage().instance().get(&Self::REWARD_MGR_KEY)
+    }
+
+    // ========== Admin Storage Functions ==========
+
+    pub fn set_admin(env: &Env, admin: &Address) {
+        env.storage().instance().set(&Self::ADMIN_KEY, admin);
+    }
+
+    pub fn get_admin(env: &Env) -> Option<Address> {
+        env.storage().instance().get(&Self::ADMIN_KEY)
+    }
+
+    // ========== Blacklist Storage Functions ==========
+
+    fn blacklist_key(creator: &Address) -> (soroban_sdk::Symbol, Address) {
+        (symbol_short!("BLKLST"), creator.clone())
+    }
+
+    pub fn blacklist_creator(env: &Env, creator: &Address) {
+        env.storage()
+            .instance()
+            .set(&Self::blacklist_key(creator), &true);
+    }
+
+    pub fn remove_from_blacklist(env: &Env, creator: &Address) {
+        env.storage()
+            .instance()
+            .remove(&Self::blacklist_key(creator));
+    }
+
+    pub fn is_blacklisted(env: &Env, creator: &Address) -> bool {
+        env.storage()
+            .instance()
+            .get::<_, bool>(&Self::blacklist_key(creator))
+            .unwrap_or(false)
     }
 }
