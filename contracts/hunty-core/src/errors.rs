@@ -36,6 +36,8 @@ pub enum HuntErrorCode {
     AnswersPaused = 29,
     RewardsPaused = 30,
     HuntEndTimeInPast = 31,
+    NoPendingAdmin = 32,
+    PendingAdminMismatch = 33,
 }
 
 #[derive(Debug)]
@@ -69,6 +71,9 @@ pub enum HuntError {
     AnswersPaused,
     RewardsPaused,
     HuntEndTimeInPast { end_time: u64, current_time: u64 },
+    NoPendingAdmin,
+    PendingAdminMismatch { expected: soroban_sdk::Address, actual: soroban_sdk::Address },
+    AdminAlreadyProposed { pending: soroban_sdk::Address },
 }
 
 impl fmt::Display for HuntError {
@@ -179,6 +184,19 @@ impl fmt::Display for HuntError {
             HuntError::HuntEndTimeInPast { end_time, current_time } => {
                 write!(f, "Hunt end_time {} is in the past (current time: {})", end_time, current_time)
             }
+            HuntError::NoPendingAdmin => {
+                write!(f, "No pending admin rotation to accept")
+            }
+            HuntError::PendingAdminMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "Pending admin mismatch: expected {}, got {}",
+                    expected, actual
+                )
+            }
+            HuntError::AdminAlreadyProposed { pending } => {
+                write!(f, "Admin rotation already proposed for {}", pending)
+            }
         }
     }
 }
@@ -215,6 +233,9 @@ impl From<HuntError> for HuntErrorCode {
             HuntError::AnswersPaused => HuntErrorCode::AnswersPaused,
             HuntError::RewardsPaused => HuntErrorCode::RewardsPaused,
             HuntError::HuntEndTimeInPast { .. } => HuntErrorCode::HuntEndTimeInPast,
+            HuntError::NoPendingAdmin => HuntErrorCode::NoPendingAdmin,
+            HuntError::PendingAdminMismatch { .. } => HuntErrorCode::PendingAdminMismatch,
+            HuntError::AdminAlreadyProposed { .. } => HuntErrorCode::Unauthorized,
         }
     }
 }
