@@ -48,22 +48,23 @@ pub fn extend_ttl<K: IntoVal<Env, soroban_sdk::Val>>(env: &Env, key: &K, policy:
 impl Storage {
     // Symbol constants for key prefixes to prevent collisions
     // Using symbol_short for efficient key generation
+    // Shortened, unique storage key prefixes (reduced to minimal unique prefixes)
     const HUNT_KEY: soroban_sdk::Symbol = symbol_short!("HUNT");
-    const CLUE_KEY: soroban_sdk::Symbol = symbol_short!("CLUE");
-    const PROGRESS_KEY: soroban_sdk::Symbol = symbol_short!("PROG");
-    const PLAYERS_LIST_KEY: soroban_sdk::Symbol = symbol_short!("PLRS");
-    const CLUES_LIST_KEY: soroban_sdk::Symbol = symbol_short!("CLST");
-    const HUNT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CNTR");
-    const CLUE_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CCNT");
-    const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("RWDMGR");
-    const BAN_KEY: soroban_sdk::Symbol = symbol_short!("BAN");
-    const SUBMISSION_KEY: soroban_sdk::Symbol = symbol_short!("SUBMIT");
-    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMIN");
-    const VIEW_ONLY_KEY: soroban_sdk::Symbol = symbol_short!("VIEW");
-    const GLOBAL_VIEW_ONLY_KEY: soroban_sdk::Symbol = symbol_short!("GVW");
-    const PAUSE_REGISTRATIONS_KEY: soroban_sdk::Symbol = symbol_short!("PAUSE_REG");
-    const PAUSE_ANSWERS_KEY: soroban_sdk::Symbol = symbol_short!("PAUSE_ANS");
-    const PAUSE_REWARDS_KEY: soroban_sdk::Symbol = symbol_short!("PAUSE_RWD");
+    const CLUE_KEY: soroban_sdk::Symbol = symbol_short!("CLU");
+    const PROGRESS_KEY: soroban_sdk::Symbol = symbol_short!("PR");
+    const PLAYERS_LIST_KEY: soroban_sdk::Symbol = symbol_short!("PL");
+    const CLUES_LIST_KEY: soroban_sdk::Symbol = symbol_short!("CLS");
+    const HUNT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CN");
+    const CLUE_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CC");
+    const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("R");
+    const BAN_KEY: soroban_sdk::Symbol = symbol_short!("BA");
+    const SUBMISSION_KEY: soroban_sdk::Symbol = symbol_short!("S");
+    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("AD");
+    const VIEW_ONLY_KEY: soroban_sdk::Symbol = symbol_short!("V");
+    const GLOBAL_VIEW_ONLY_KEY: soroban_sdk::Symbol = symbol_short!("GV");
+    const PAUSE_REGISTRATIONS_KEY: soroban_sdk::Symbol = symbol_short!("PAUSE_RE");
+    const PAUSE_ANSWERS_KEY: soroban_sdk::Symbol = symbol_short!("PAUSE_A");
+    const PAUSE_REWARDS_KEY: soroban_sdk::Symbol = symbol_short!("PAUSE_RW");
     
     // Pause functions
     pub fn set_pause_registrations(env: &Env, paused: bool) {

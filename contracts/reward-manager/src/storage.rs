@@ -5,28 +5,28 @@ use crate::types::{DistributionRecord, RewardPoolConfig};
 pub struct Storage;
 
 impl Storage {
-    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMIN");
-    const XLM_TOKEN_KEY: soroban_sdk::Symbol = symbol_short!("XLMTKN");
-    const NFT_CONTRACT_KEY: soroban_sdk::Symbol = symbol_short!("NFTADR");
+    // Shortened storage prefixes for reward-manager
+    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMI");
+    const XLM_TOKEN_KEY: soroban_sdk::Symbol = symbol_short!("X");
+    const NFT_CONTRACT_KEY: soroban_sdk::Symbol = symbol_short!("NFTA");
     // Daily spending caps
-    const DAILY_POOL_CAP_KEY: soroban_sdk::Symbol = symbol_short!("DPCAP");
-    const DAILY_GLOBAL_CAP_KEY: soroban_sdk::Symbol = symbol_short!("DGRCAP");
+    const DAILY_POOL_CAP_KEY: soroban_sdk::Symbol = symbol_short!("DPC");
+    const DAILY_GLOBAL_CAP_KEY: soroban_sdk::Symbol = symbol_short!("DGR");
     // Daily distribution tracking
-    const DAILY_POOL_DIST_KEY: soroban_sdk::Symbol = symbol_short!("DPDST");
-    const DAILY_GLOBAL_DIST_KEY: soroban_sdk::Symbol = symbol_short!("DGDST");
-    const DISTRIBUTION_KEY: soroban_sdk::Symbol = symbol_short!("DIST");
-    const DIST_RECORD_KEY: soroban_sdk::Symbol = symbol_short!("DREC");
-    const DIST_NONCE_KEY: soroban_sdk::Symbol = symbol_short!("DNONCE");
+    const DAILY_POOL_DIST_KEY: soroban_sdk::Symbol = symbol_short!("DPD");
+    const DAILY_GLOBAL_DIST_KEY: soroban_sdk::Symbol = symbol_short!("DGD");
+    const DISTRIBUTION_KEY: soroban_sdk::Symbol = symbol_short!("DI");
+    const DIST_RECORD_KEY: soroban_sdk::Symbol = symbol_short!("DR");
+    const DIST_NONCE_KEY: soroban_sdk::Symbol = symbol_short!("DN");
     const POOL_KEY: soroban_sdk::Symbol = symbol_short!("POOL");
-    const POOL_CFG_KEY: soroban_sdk::Symbol = symbol_short!("PCFG");
-    const POOL_DEP_KEY: soroban_sdk::Symbol = symbol_short!("PDEP");
-    const POOL_DST_KEY: soroban_sdk::Symbol = symbol_short!("PDST");
-    const TOTAL_XLM_DST_KEY: soroban_sdk::Symbol = symbol_short!("TXLMDST");
-    const HUNTY_CORE_KEY: soroban_sdk::Symbol = symbol_short!("HCORE");
-    const TOTAL_XLM_DST_KEY: soroban_sdk::Symbol = symbol_short!("TXDST");
-    const IN_DISTRIBUTION_KEY: soroban_sdk::Symbol = symbol_short!("IN_DIST");
-    const PAUSED_KEY: soroban_sdk::Symbol = symbol_short!("PAUSED");
-    const EMERGENCY_LOG_KEY: soroban_sdk::Symbol = symbol_short!("EMLOG");
+    const POOL_CFG_KEY: soroban_sdk::Symbol = symbol_short!("PC");
+    const POOL_DEP_KEY: soroban_sdk::Symbol = symbol_short!("PDE");
+    const POOL_DST_KEY: soroban_sdk::Symbol = symbol_short!("PDS");
+    const TOTAL_XLM_DST_KEY: soroban_sdk::Symbol = symbol_short!("TXL");
+    const HUNTY_CORE_KEY: soroban_sdk::Symbol = symbol_short!("H");
+    const IN_DISTRIBUTION_KEY: soroban_sdk::Symbol = symbol_short!("IN_");
+    const PAUSED_KEY: soroban_sdk::Symbol = symbol_short!("PA");
+    const EMERGENCY_LOG_KEY: soroban_sdk::Symbol = symbol_short!("EML");
 
     // ========== Admin ==========
 

@@ -5,20 +5,21 @@ use soroban_sdk::{symbol_short, Address, Env, Vec};
 pub struct Storage;
 
 impl Storage {
-    const NFT_KEY: soroban_sdk::Symbol = symbol_short!("NFT");
-    const NFT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CNTR");
+    // Shortened storage prefixes for nft-reward
+    const NFT_KEY: soroban_sdk::Symbol = symbol_short!("NF");
+    const NFT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CN");
     const OWNER_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("ONFC");
-    const HUNT_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("HNFC");
-    const MAX_SUPPLY_KEY: soroban_sdk::Symbol = symbol_short!("MAXS");
-    const INITIALIZED_KEY: soroban_sdk::Symbol = symbol_short!("INIT");
-    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMIN");
-    const MINTER_KEY: soroban_sdk::Symbol = symbol_short!("MNTR");
-    const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("RWDMGR");
-    const NFT_VERSION_KEY: soroban_sdk::Symbol = symbol_short!("NVER");
-    const TOTAL_HUNTS_KEY: soroban_sdk::Symbol = symbol_short!("THUNTS");
-    const TOTAL_OWNERS_KEY: soroban_sdk::Symbol = symbol_short!("TOWNRS");
-    const ALL_NFTS_KEY: soroban_sdk::Symbol = symbol_short!("ANFTS");
-    const CONTRACT_VERSION_KEY: soroban_sdk::Symbol = symbol_short!("CVER");
+    const HUNT_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("HN");
+    const MAX_SUPPLY_KEY: soroban_sdk::Symbol = symbol_short!("MA");
+    const INITIALIZED_KEY: soroban_sdk::Symbol = symbol_short!("I");
+    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("A");
+    const MINTER_KEY: soroban_sdk::Symbol = symbol_short!("MN");
+    const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("R");
+    const NFT_VERSION_KEY: soroban_sdk::Symbol = symbol_short!("NV");
+    const TOTAL_HUNTS_KEY: soroban_sdk::Symbol = symbol_short!("TH");
+    const TOTAL_OWNERS_KEY: soroban_sdk::Symbol = symbol_short!("TO");
+    const ALL_NFTS_KEY: soroban_sdk::Symbol = symbol_short!("AN");
+    const CONTRACT_VERSION_KEY: soroban_sdk::Symbol = symbol_short!("CV");
 
     fn nft_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
         (Self::NFT_KEY, nft_id)
