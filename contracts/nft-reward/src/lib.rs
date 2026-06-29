@@ -81,6 +81,7 @@ pub struct NftData {
     pub transferable: bool,
     pub minted_at: u64,
     pub locked: bool,
+    pub metadata_frozen: bool,
 }
 
 /// Event emitted when an NFT is minted.
@@ -124,6 +125,14 @@ pub struct NftTransferredEvent {
 pub struct NftMetadataUpdatedEvent {
     pub nft_id: u64,
     pub updater: Address,
+}
+
+/// Event emitted when an NFT's metadata is permanently frozen.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NftMetadataFrozenEvent {
+    pub nft_id: u64,
+    pub owner: Address,
 }
 
 /// Event emitted when admin batch-updates image URIs across NFTs.
@@ -409,6 +418,7 @@ impl NftReward {
             transferable,
             minted_at,
             locked: false,
+            metadata_frozen: false,
         };
 
         Storage::save_nft(&env, &nft_data);
@@ -544,6 +554,10 @@ impl NftReward {
             return Err(crate::errors::NftErrorCode::NotOwner);
         }
 
+        if nft.metadata_frozen {
+            return Err(crate::errors::NftErrorCode::MetadataFrozen);
+        }
+
         let new_description = Self::sanitize_metadata_field(
             &env,
             &new_description,
@@ -560,6 +574,36 @@ impl NftReward {
         env.events().publish(
             (Symbol::new(&env, "NftMetadataUpdated"), nft_id),
             NftMetadataUpdatedEvent { nft_id, updater },
+        );
+
+        Ok(())
+    }
+
+    /// Permanently freezes the NFT's metadata, preventing future updates. Owner only.
+    pub fn freeze_nft_metadata(
+        env: Env,
+        nft_id: u64,
+        owner: Address,
+    ) -> Result<(), crate::errors::NftErrorCode> {
+        owner.require_auth();
+
+        let mut nft =
+            Storage::get_nft(&env, nft_id).ok_or(crate::errors::NftErrorCode::NftNotFound)?;
+
+        if nft.owner != owner {
+            return Err(crate::errors::NftErrorCode::NotOwner);
+        }
+
+        if nft.metadata_frozen {
+            return Err(crate::errors::NftErrorCode::MetadataFrozen);
+        }
+
+        nft.metadata_frozen = true;
+        Storage::save_nft(&env, &nft);
+
+        env.events().publish(
+            (Symbol::new(&env, "NftMetadataFrozen"), nft_id),
+            NftMetadataFrozenEvent { nft_id, owner },
         );
 
         Ok(())
