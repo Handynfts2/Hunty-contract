@@ -93,10 +93,6 @@ pub struct NftMintedEvent {
     pub rarity: u32,
     pub tier: u32,
     pub metadata: NftMetadata,
-    pub hunt_title: String,
-    pub total_minted_for_hunt: u64,
-    pub completion_rank: u32,
-    pub collection_stats: NftCollectionStats,
     pub minted_at: u64,
 }
 
@@ -457,22 +453,6 @@ impl NftReward {
             royalty_bps: nft.metadata.royalty_bps,
             schema_version: version,
         })
-    }
-
-    /// Returns the configured admin address, if set.
-    pub fn get_admin(env: Env) -> Option<Address> {
-        Storage::get_admin(&env)
-    }
-
-    /// Sets the RewardManager contract address. Only the admin can call this.
-    pub fn set_reward_manager(
-        env: Env,
-        admin: Address,
-        reward_manager: Address,
-    ) -> Result<(), crate::errors::NftErrorCode> {
-        Self::require_admin(&env, &admin)?;
-        Storage::set_reward_manager(&env, &reward_manager);
-        Ok(())
     }
 
     /// Batch-updates image URIs for all NFTs whose `image_uri` starts with `old_prefix`,
