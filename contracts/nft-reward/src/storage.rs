@@ -1,5 +1,5 @@
-use crate::{NftData, TransferRecord};
-use soroban_sdk::{symbol_short, Address, Env, Vec};
+use crate::{NftData, NftCore, NftMetadata};
+use soroban_sdk::{symbol_short, Address, Env, Vec, Symbol};
 
 /// Storage layer for NFTs.
 pub struct Storage;
@@ -7,6 +7,8 @@ pub struct Storage;
 impl Storage {
     // Shortened storage prefixes for nft-reward
     const NFT_KEY: soroban_sdk::Symbol = symbol_short!("NF");
+    const NFT_CORE_KEY: soroban_sdk::Symbol = symbol_short!("NC");
+    const NFT_META_KEY: soroban_sdk::Symbol = symbol_short!("NM");
     const NFT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CN");
     const OWNER_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("ONFC");
     const HUNT_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("HN");
@@ -20,10 +22,17 @@ impl Storage {
     const TOTAL_OWNERS_KEY: soroban_sdk::Symbol = symbol_short!("TO");
     const ALL_NFTS_KEY: soroban_sdk::Symbol = symbol_short!("AN");
     const CONTRACT_VERSION_KEY: soroban_sdk::Symbol = symbol_short!("CV");
-    const TRANSFER_HISTORY_KEY: soroban_sdk::Symbol = symbol_short!("THST");
 
     fn nft_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
         (Self::NFT_KEY, nft_id)
+    }
+
+    fn nft_core_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
+        (Self::NFT_CORE_KEY, nft_id)
+    }
+
+    fn nft_metadata_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
+        (Self::NFT_META_KEY, nft_id)
     }
 
     fn nft_version_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
@@ -63,10 +72,6 @@ impl Storage {
         operator: &Address,
     ) -> (soroban_sdk::Symbol, Address, Address) {
         (symbol_short!("OPKEY"), owner.clone(), operator.clone())
-    }
-
-    fn approval_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
-        (symbol_short!("APR"), nft_id)
     }
 
     fn locker_key(locker: &Address) -> (soroban_sdk::Symbol, Address) {
@@ -114,8 +119,23 @@ impl Storage {
     }
 
     pub fn save_nft(env: &Env, nft: &NftData) {
-        let key = Self::nft_key(nft.nft_id);
-        env.storage().persistent().set(&key, nft);
+        let core = NftCore {
+            nft_id: nft.nft_id,
+            hunt_id: nft.hunt_id,
+            owner: nft.owner.clone(),
+            completion_player: nft.completion_player.clone(),
+            transferable: nft.transferable,
+            minted_at: nft.minted_at,
+            locked: nft.locked,
+        };
+        let core_key = Self::nft_core_key(nft.nft_id);
+        env.storage().persistent().set(&core_key, &core);
+
+        let meta_key = Self::nft_metadata_key(nft.nft_id);
+        let existing_meta: Option<NftMetadata> = env.storage().persistent().get(&meta_key);
+        if existing_meta.as_ref() != Some(&nft.metadata) {
+            env.storage().persistent().set(&meta_key, &nft.metadata);
+        }
 
         // Also add to all NFTs list for iteration (only if not already present)
         let mut all_nfts = env
@@ -132,8 +152,48 @@ impl Storage {
     }
 
     pub fn get_nft(env: &Env, nft_id: u64) -> Option<NftData> {
-        let key = Self::nft_key(nft_id);
-        env.storage().persistent().get(&key)
+        let core_key = Self::nft_core_key(nft_id);
+        let core: Option<NftCore> = env.storage().persistent().get(&core_key);
+        
+        let meta_key = Self::nft_metadata_key(nft_id);
+        let meta: Option<NftMetadata> = env.storage().persistent().get(&meta_key);
+
+        if let (Some(c), Some(m)) = (core, meta) {
+            Some(NftData {
+                nft_id: c.nft_id,
+                hunt_id: c.hunt_id,
+                owner: c.owner,
+                completion_player: c.completion_player,
+                metadata: m,
+                transferable: c.transferable,
+                minted_at: c.minted_at,
+                locked: c.locked,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn remove_nft(env: &Env, nft_id: u64) {
+        let core_key = Self::nft_core_key(nft_id);
+        env.storage().persistent().remove(&core_key);
+
+        let meta_key = Self::nft_metadata_key(nft_id);
+        env.storage().persistent().remove(&meta_key);
+
+        let version_key = Self::nft_version_key(nft_id);
+        env.storage().persistent().remove(&version_key);
+
+        // Also remove from ALL_NFTS_KEY list
+        let mut all_nfts = env
+            .storage()
+            .persistent()
+            .get(&Self::ALL_NFTS_KEY)
+            .unwrap_or_else(|| Vec::new(env));
+        if let Some(idx) = all_nfts.first_index_of(nft_id) {
+            all_nfts.remove(idx);
+            env.storage().persistent().set(&Self::ALL_NFTS_KEY, &all_nfts);
+        }
     }
 
     pub fn set_nft_version(env: &Env, nft_id: u64, version: u32) {
@@ -397,26 +457,6 @@ impl Storage {
         env.storage().persistent().get(&key).unwrap_or(false)
     }
 
-    // --- Approval management (per-token delegation) ---
-
-    /// Sets the approved address for a specific NFT.
-    pub fn set_approval(env: &Env, nft_id: u64, approved: &Address) {
-        let key = Self::approval_key(nft_id);
-        env.storage().persistent().set(&key, approved);
-    }
-
-    /// Removes approval for a specific NFT.
-    pub fn clear_approval(env: &Env, nft_id: u64) {
-        let key = Self::approval_key(nft_id);
-        env.storage().persistent().remove(&key);
-    }
-
-    /// Gets the approved address for a specific NFT, if any.
-    pub fn get_approval(env: &Env, nft_id: u64) -> Option<Address> {
-        let key = Self::approval_key(nft_id);
-        env.storage().persistent().get(&key)
-    }
-
     // --- Contract version ---
 
     pub fn set_contract_version(env: &Env, version: u32) {
@@ -427,39 +467,5 @@ impl Storage {
 
     pub fn get_contract_version(env: &Env) -> Option<u32> {
         env.storage().instance().get(&Self::CONTRACT_VERSION_KEY)
-    }
-
-    fn transfer_history_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
-        (Self::TRANSFER_HISTORY_KEY, nft_id)
-    }
-
-    pub fn save_transfer_record(env: &Env, nft_id: u64, record: &TransferRecord) {
-        let key = Self::transfer_history_key(nft_id);
-        let mut history: Vec<TransferRecord> = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or_else(|| Vec::new(env));
-
-        if history.len() >= crate::MAX_TRANSFER_HISTORY {
-            let mut trimmed: Vec<TransferRecord> = Vec::new(env);
-            let len = history.len();
-            for i in 1..len {
-                if let Some(r) = history.get(i) {
-                    trimmed.push_back(r);
-                }
-            }
-            history = trimmed;
-        }
-        history.push_back(record.clone());
-        env.storage().persistent().set(&key, &history);
-    }
-
-    pub fn get_transfer_history(env: &Env, nft_id: u64) -> Vec<TransferRecord> {
-        let key = Self::transfer_history_key(nft_id);
-        env.storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or_else(|| Vec::new(env))
     }
 }

@@ -43,7 +43,6 @@ pub enum HuntErrorCode {
     AddressBlacklisted = 36,
     ContractPaused = 37,
     InvalidMaxAttempts = 38,
-    MaxAttemptsExceeded = 39,
 }
 
 #[derive(Debug)]
@@ -84,8 +83,6 @@ pub enum HuntError {
     InvalidTimeBonusConfig,
     AddressBlacklisted,
     ContractPaused,
-    InvalidMaxAttempts,
-    MaxAttemptsExceeded { clue_id: u32, limit: u32 },
 }
 
 impl fmt::Display for HuntError {
@@ -202,12 +199,12 @@ impl fmt::Display for HuntError {
             HuntError::PendingAdminMismatch { expected, actual } => {
                 write!(
                     f,
-                    "Pending admin mismatch: expected {}, got {}",
+                    "Pending admin mismatch: expected {:?}, got {:?}",
                     expected, actual
                 )
             }
             HuntError::AdminAlreadyProposed { pending } => {
-                write!(f, "Admin rotation already proposed for {}", pending)
+                write!(f, "Admin rotation already proposed for {:?}", pending)
             }
             HuntError::AddressBlacklisted => {
                 write!(f, "Address is blacklisted from creating hunts")
@@ -220,12 +217,6 @@ impl fmt::Display for HuntError {
             }
             HuntError::ContractPaused => {
                 write!(f, "Contract is currently paused")
-            }
-            HuntError::InvalidMaxAttempts => {
-                write!(f, "max_attempts_per_clue must be greater than zero")
-            }
-            HuntError::MaxAttemptsExceeded { clue_id, limit } => {
-                write!(f, "Max attempts ({}) exceeded for clue {}", limit, clue_id)
             }
         }
     }
@@ -270,8 +261,6 @@ impl From<HuntError> for HuntErrorCode {
             HuntError::InvalidTimeBonusConfig => HuntErrorCode::InvalidTimeBonusConfig,
             HuntError::AddressBlacklisted => HuntErrorCode::AddressBlacklisted,
             HuntError::ContractPaused => HuntErrorCode::ContractPaused,
-            HuntError::InvalidMaxAttempts => HuntErrorCode::InvalidMaxAttempts,
-            HuntError::MaxAttemptsExceeded { .. } => HuntErrorCode::MaxAttemptsExceeded,
         }
     }
 }
