@@ -18,4 +18,8 @@ pub enum NftErrorCode {
     NftLocked = 12,
     InvalidMetadata = 13,
     MetadataFrozen = 14,
+    TooManyExtensions = 15,
+    InvalidExtensionKey = 16,
+    InvalidExtensionValue = 17,
+    ExtensionNotFound = 18,
 }
