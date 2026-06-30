@@ -1831,6 +1831,160 @@ HuntyCore::get_hunt_leaderboard(env.clone(), hunt_id, 3)
 
     // ────────────────────────────────────────────────────────────────────────
 
+    // ── Regression tests for max_attempts_per_clue enforcement (issue #433) ─
+
+    /// Helper: create a hunt with max_attempts set, one required clue, activate, register player.
+    fn setup_limited_attempt_hunt(
+        env: &Env,
+        max_attempts: u32,
+    ) -> (Address, u64, u32, Address, Address) {
+        let contract_id = env.register(HuntyCore, ());
+        let creator = Address::generate(env);
+        let player = Address::generate(env);
+        env.mock_all_auths();
+
+        let hunt_id = as_core_contract(env, &contract_id, |env| {
+            HuntyCore::create_hunt(
+                env.clone(),
+                creator.clone(),
+                String::from_str(env, "Hunt"),
+                String::from_str(env, "Desc"),
+                None,
+                None,
+                0,
+                None,
+            )
+            .unwrap()
+        });
+
+        as_core_contract(env, &contract_id, |env| {
+            HuntyCore::update_hunt(env.clone(), hunt_id, creator.clone(), max_attempts).unwrap();
+        });
+
+        let clue_id = as_core_contract(env, &contract_id, |env| {
+            HuntyCore::add_clue(
+                env.clone(),
+                hunt_id,
+                String::from_str(env, "Q?"),
+                String::from_str(env, "correct"),
+                10,
+                true,
+                None,
+            )
+            .unwrap()
+        });
+
+        as_core_contract(env, &contract_id, |env| {
+            HuntyCore::activate_hunt(env.clone(), hunt_id, creator.clone()).unwrap();
+            HuntyCore::register_player(env.clone(), hunt_id, player.clone()).unwrap();
+        });
+
+        (contract_id, hunt_id, clue_id, player, creator)
+    }
+
+    /// Submit a wrong answer, incrementing a counter-based nonce.
+    fn submit_wrong(
+        env: &Env,
+        contract_id: &Address,
+        hunt_id: u64,
+        clue_id: u32,
+        player: &Address,
+        nonce: u64,
+    ) -> Result<(), HuntErrorCode> {
+        env.mock_all_auths();
+        as_core_contract(env, contract_id, |env| {
+            HuntyCore::submit_answer(
+                env.clone(),
+                hunt_id,
+                clue_id,
+                player.clone(),
+                String::from_str(env, "wrong"),
+                nonce,
+                env.ledger().timestamp(),
+            )
+        })
+    }
+
+    #[test]
+    fn test_max_attempts_exceeded_after_limit() {
+        // With max_attempts = 3: first two wrong answers return InvalidAnswer;
+        // the third (hitting the limit) returns MaxAttemptsExceeded.
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let (contract_id, hunt_id, clue_id, player, _) = setup_limited_attempt_hunt(&env, 3);
+
+        assert_eq!(submit_wrong(&env, &contract_id, hunt_id, clue_id, &player, 1), Err(HuntErrorCode::InvalidAnswer));
+        assert_eq!(submit_wrong(&env, &contract_id, hunt_id, clue_id, &player, 2), Err(HuntErrorCode::InvalidAnswer));
+        assert_eq!(
+            submit_wrong(&env, &contract_id, hunt_id, clue_id, &player, 3),
+            Err(HuntErrorCode::MaxAttemptsExceeded),
+            "third wrong answer should hit the limit"
+        );
+    }
+
+    #[test]
+    fn test_correct_answer_on_last_attempt_succeeds() {
+        // With max_attempts = 2: one wrong answer, then correct on the last slot → success.
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let (contract_id, hunt_id, clue_id, player, _) = setup_limited_attempt_hunt(&env, 2);
+
+        assert_eq!(submit_wrong(&env, &contract_id, hunt_id, clue_id, &player, 1), Err(HuntErrorCode::InvalidAnswer));
+
+        env.mock_all_auths();
+        let result = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::submit_answer(
+                env.clone(),
+                hunt_id,
+                clue_id,
+                player.clone(),
+                String::from_str(env, "correct"),
+                2,
+                env.ledger().timestamp(),
+            )
+        });
+        assert!(result.is_ok(), "correct answer on last attempt should succeed: {:?}", result);
+    }
+
+    #[test]
+    fn test_attempt_counter_persists_across_calls() {
+        // Submit one wrong answer, then read back progress and verify failed_attempts = 1.
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let (contract_id, hunt_id, clue_id, player, _) = setup_limited_attempt_hunt(&env, 5);
+
+        assert_eq!(submit_wrong(&env, &contract_id, hunt_id, clue_id, &player, 1), Err(HuntErrorCode::InvalidAnswer));
+
+        // Second wrong answer in a separate call — counter must have persisted
+        assert_eq!(submit_wrong(&env, &contract_id, hunt_id, clue_id, &player, 2), Err(HuntErrorCode::InvalidAnswer));
+
+        // Read progress and verify the stored count
+        let progress = as_core_contract(&env, &contract_id, |env| {
+            HuntyCore::get_player_progress(env.clone(), hunt_id, player.clone()).unwrap()
+        });
+        assert_eq!(
+            progress.failed_attempts.get(clue_id).unwrap_or(0),
+            2,
+            "failed_attempts for clue should be 2 after two wrong submissions"
+        );
+    }
+
+    #[test]
+    fn test_max_attempts_equals_one() {
+        // With max_attempts = 1: the very first wrong answer hits the limit immediately.
+        let env = Env::default();
+        env.ledger().set_timestamp(1_700_000_000);
+        let (contract_id, hunt_id, clue_id, player, _) = setup_limited_attempt_hunt(&env, 1);
+
+        assert_eq!(
+            submit_wrong(&env, &contract_id, hunt_id, clue_id, &player, 1),
+            Err(HuntErrorCode::MaxAttemptsExceeded),
+            "max_attempts=1: first wrong answer should immediately exceed the limit"
+        );
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+
     #[test]
     fn test_get_clue_excludes_answer_hash() {
         let env = Env::default();
