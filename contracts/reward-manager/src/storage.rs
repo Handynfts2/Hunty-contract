@@ -19,15 +19,13 @@ impl Storage {
     const DIST_NONCE_KEY: soroban_sdk::Symbol = symbol_short!("DN");
     const DIST_RESOLVE_KEY: soroban_sdk::Symbol = symbol_short!("DRS");
     const POOL_KEY: soroban_sdk::Symbol = symbol_short!("POOL");
-    const POOL_CFG_KEY: soroban_sdk::Symbol = symbol_short!("PC");
-    const POOL_DEP_KEY: soroban_sdk::Symbol = symbol_short!("PDE");
-    const POOL_DST_KEY: soroban_sdk::Symbol = symbol_short!("PDS");
-    const TOTAL_XLM_DST_KEY: soroban_sdk::Symbol = symbol_short!("TXL");
-    const HUNTY_CORE_KEY: soroban_sdk::Symbol = symbol_short!("H");
-    const IN_DISTRIBUTION_KEY: soroban_sdk::Symbol = symbol_short!("IN_");
-    const PAUSED_KEY: soroban_sdk::Symbol = symbol_short!("PA");
-    const EMERGENCY_LOG_KEY: soroban_sdk::Symbol = symbol_short!("EML");
-    const PENDING_NFT_KEY: soroban_sdk::Symbol = symbol_short!("PNFT");
+    const POOL_CFG_KEY: soroban_sdk::Symbol = symbol_short!("PCFG");
+    const POOL_DEP_KEY: soroban_sdk::Symbol = symbol_short!("PDEP");
+    const POOL_DST_KEY: soroban_sdk::Symbol = symbol_short!("PDST");
+    const HUNTY_CORE_KEY: soroban_sdk::Symbol = symbol_short!("HCORE");
+    const TOTAL_XLM_DST_KEY: soroban_sdk::Symbol = symbol_short!("TXDST");
+    const IN_DISTRIBUTION_KEY: soroban_sdk::Symbol = symbol_short!("IN_DIST");
+    const HAS_AUTH_KEY: soroban_sdk::Symbol = symbol_short!("HAUTH");
 
     // ========== Admin ==========
 
@@ -266,6 +264,32 @@ impl Storage {
     pub fn get_daily_global_distributed(env: &Env, day: u64) -> i128 {
         let key = (Self::DAILY_GLOBAL_DIST_KEY, day);
         env.storage().persistent().get(&key).unwrap_or(0)
+    }
+
+    // ========== Authorized Cross-Contract Callers ==========
+
+    fn authorized_contract_key(contract: &Address) -> (soroban_sdk::Symbol, Address) {
+        (symbol_short!("AUTH"), contract.clone())
+    }
+
+    pub fn has_authorized_contracts(env: &Env) -> bool {
+        env.storage().instance().get(&Self::HAS_AUTH_KEY).unwrap_or(false)
+    }
+
+    pub fn add_authorized_contract(env: &Env, contract: &Address) {
+        let key = Self::authorized_contract_key(contract);
+        env.storage().persistent().set(&key, &true);
+        env.storage().instance().set(&Self::HAS_AUTH_KEY, &true);
+    }
+
+    pub fn remove_authorized_contract(env: &Env, contract: &Address) {
+        let key = Self::authorized_contract_key(contract);
+        env.storage().persistent().remove(&key);
+    }
+
+    pub fn is_authorized_contract(env: &Env, contract: &Address) -> bool {
+        let key = Self::authorized_contract_key(contract);
+        env.storage().persistent().get(&key).unwrap_or(false)
     }
 
     // ========== Reentrancy Guard ==========

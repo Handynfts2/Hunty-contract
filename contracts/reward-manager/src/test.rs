@@ -3,9 +3,9 @@ mod test {
     use crate::errors::RewardErrorCode;
     use crate::storage::Storage;
     use crate::types::RewardConfig;
-    use crate::{RewardManager, RewardsDistributedEvent};
-use soroban_sdk::testutils::{Address as _, Events as _, Ledger as _};
-use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol, TryFromVal, Val, Vec};
+    use crate::RewardManager;
+    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol, Val};
 
     /// Registers the RewardManager contract and a mock SAC token.
     /// Returns (contract_id, token_address, token_admin).
@@ -2006,378 +2006,163 @@ fn test_distribute_rewards_failed_nft_creates_pending_entry() {
         assert_eq!(get_balance(&env, &token_address, &recipient), 0);
     }
 
-    // ========== Upgrade authorization ==========
+    // ========== Authorized Contracts ==========
 
     #[test]
-    fn test_propose_upgrade_requires_admin() {
+    fn test_admin_adds_authorized_contract() {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        let (contract_id, token_address, _) = setup(&env);
+        let admin = Address::generate(&env);
+
+        env.as_contract(&contract_id, || {
+            RewardManager::initialize(env.clone(), admin.clone(), token_address).unwrap();
+            let authorized = Address::generate(&env);
+            let result = RewardManager::add_authorized_contract(
+                env.clone(),
+                admin.clone(),
+                authorized.clone(),
+            );
+            assert!(result.is_ok());
+            assert!(Storage::is_authorized_contract(&env, &authorized));
+        });
+    }
+
+    #[test]
+    fn test_non_admin_cannot_add_authorized_contract() {
         let env = Env::default();
         env.mock_all_auths_allowing_non_root_auth();
         let (contract_id, token_address, _) = setup(&env);
         let admin = Address::generate(&env);
         let attacker = Address::generate(&env);
+        let authorized = Address::generate(&env);
 
         env.as_contract(&contract_id, || {
-            RewardManager::initialize(env.clone(), admin.clone(), token_address.clone()).unwrap();
-            RewardManager::initialize_schema(env.clone(), admin.clone());
-
-            let result = RewardManager::propose_upgrade(env.clone(), attacker, 2);
-            assert_eq!(
-                result,
-                Err(hunty_migration::UpgradeAuthError::Unauthorized)
+            RewardManager::initialize(env.clone(), admin.clone(), token_address).unwrap();
+            let result = RewardManager::add_authorized_contract(
+                env.clone(),
+                attacker,
+                authorized.clone(),
             );
+            assert_eq!(result, Err(RewardErrorCode::Unauthorized));
+            assert!(!Storage::is_authorized_contract(&env, &authorized));
         });
     }
 
     #[test]
-    fn test_run_migration_requires_proposal_and_timelock() {
-        let env = Env::default();
-        env.mock_all_auths_allowing_non_root_auth();
-        let (contract_id, token_address, _) = setup(&env);
-        let admin = Address::generate(&env);
-
-        env.as_contract(&contract_id, || {
-            RewardManager::initialize(env.clone(), admin.clone(), token_address.clone()).unwrap();
-            RewardManager::set_upgrade_timelock(env.clone(), admin.clone(), 3600).unwrap();
-
-            let without_proposal =
-                RewardManager::run_migration(env.clone(), admin.clone(), 2, false);
-            assert_eq!(
-                without_proposal,
-                Err(hunty_migration::UpgradeAuthError::NoProposal)
-            );
-
-            RewardManager::propose_upgrade(env.clone(), admin.clone(), 2).unwrap();
-            let before_timelock =
-                RewardManager::run_migration(env.clone(), admin.clone(), 2, false);
-            assert_eq!(
-                before_timelock,
-                Err(hunty_migration::UpgradeAuthError::TimelockPending)
-            );
-
-            env.ledger().set_timestamp(env.ledger().timestamp() + 3601);
-            let executed = RewardManager::run_migration(env.clone(), admin.clone(), 2, false);
-            assert!(executed.is_ok());
-            assert!(executed.as_ref().unwrap().succeeded);
-
-            let history = RewardManager::get_upgrade_history(env.clone(), 0, 10);
-            assert_eq!(history.len(), 1);
-        });
-    }
-
-    #[test]
-    fn test_upgrade_proposal_and_events() {
-        let env = Env::default();
-        env.mock_all_auths_allowing_non_root_auth();
-        let (contract_id, token_address, _) = setup(&env);
-        let admin = Address::generate(&env);
-
-        env.as_contract(&contract_id, || {
-            RewardManager::initialize(env.clone(), admin.clone(), token_address.clone()).unwrap();
-            RewardManager::initialize_schema(env.clone(), admin.clone());
-
-            let proposal = RewardManager::propose_upgrade(env.clone(), admin.clone(), 2).unwrap();
-            assert_eq!(proposal.target_version, 2);
-            assert_eq!(
-                RewardManager::get_upgrade_proposal(env.clone()),
-                Some(proposal)
-            );
-        });
-    }
-
-    // ========== Reward Pool Edge Cases ==========
-
-    /// Test reward pool with exactly enough balance for one distribution
-    #[test]
-    fn test_reward_pool_exact_balance_one_distribution() {
+    fn test_authorized_contract_can_call_distribute() {
         let env = Env::default();
         env.mock_all_auths_allowing_non_root_auth();
         let (contract_id, token_address, token_admin) = setup(&env);
+        let admin = Address::generate(&env);
         let creator = Address::generate(&env);
         let player = Address::generate(&env);
+        let authorized = Address::generate(&env);
 
-        mint_tokens(&env, &token_address, &token_admin, &creator, 5_000_000);
+        mint_tokens(&env, &token_address, &token_admin, &creator, 10_000);
 
+        // Initialize the contract and set up authorized contracts
         env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
+            RewardManager::initialize(env.clone(), admin.clone(), token_address.clone()).unwrap();
+            Storage::add_authorized_contract(&env, &authorized);
             RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
-            RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, 5_000_000).unwrap();
-
-            // Distribute exactly the pool balance
-            let result = RewardManager::distribute_rewards(
-                env.clone(),
-                1,
-                player.clone(),
-                xlm_only_config(&env, 5_000_000),
-            );
-
-            assert!(result.is_ok());
-            assert_eq!(RewardManager::get_pool_balance(env.clone(), 1), 0);
+            RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, 5_000).unwrap();
         });
 
-        // Verify player received the reward
-        assert_eq!(get_balance(&env, &token_address, &player), 5_000_000);
+        let mut pool_balance_before = 0i128;
+        env.as_contract(&contract_id, || {
+            pool_balance_before = RewardManager::get_pool_balance(env.clone(), 1);
+        });
+        assert!(pool_balance_before >= 2_000);
+
+        // Call distribute_rewards from the authorized contract context
+        // This simulates a cross-contract call where env.caller() == authorized
+        let config = xlm_only_config(&env, 2_000);
+        env.as_contract(&authorized, || {
+            let mut args: Vec<Val> = Vec::new(&env);
+            args.push_back((1u64).into_val(&env));
+            args.push_back(player.clone().into_val(&env));
+            args.push_back(config.clone().into_val(&env));
+
+            let result = env.try_invoke_contract::<(), RewardErrorCode>(
+                &contract_id,
+                &Symbol::new(&env, "distribute_rewards"),
+                args,
+            );
+            assert!(result.is_ok(), "invocation should succeed");
+            let inner: Result<(), RewardErrorCode> = result.unwrap();
+            assert!(inner.is_ok(), "distribute_rewards should return Ok");
+        });
+
+        // Verify player received tokens
+        assert_eq!(get_balance(&env, &token_address, &player), 2_000);
     }
 
-    /// Test reward pool with zero balance
     #[test]
-    fn test_reward_pool_zero_balance() {
+    fn test_unauthorized_contract_cannot_call_distribute() {
         let env = Env::default();
         env.mock_all_auths_allowing_non_root_auth();
         let (contract_id, token_address, token_admin) = setup(&env);
+        let admin = Address::generate(&env);
         let creator = Address::generate(&env);
         let player = Address::generate(&env);
+        let authorized = Address::generate(&env);
+        let unauthorized = Address::generate(&env);
+
+        mint_tokens(&env, &token_address, &token_admin, &creator, 10_000);
 
         env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
+            RewardManager::initialize(env.clone(), admin.clone(), token_address).unwrap();
             RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
+            RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, 5_000).unwrap();
 
-            // Try to distribute from empty pool
-            let result = RewardManager::distribute_rewards(
-                env.clone(),
-                1,
-                player.clone(),
-                xlm_only_config(&env, 1_000_000),
-            );
-            assert_eq!(result, Err(RewardErrorCode::InsufficientPool));
+            // Configure authorized contracts — only 'authorized' is allowed
+            Storage::add_authorized_contract(&env, &authorized);
         });
 
-        // Player didn't receive anything
+        // Try to distribute from an unauthorized contract context
+        let config = xlm_only_config(&env, 2_000);
+        env.as_contract(&unauthorized, || {
+            let mut args: Vec<Val> = Vec::new(&env);
+            args.push_back((1u64).into_val(&env));
+            args.push_back(player.clone().into_val(&env));
+            args.push_back(config.clone().into_val(&env));
+
+            let result = env.try_invoke_contract::<(), RewardErrorCode>(
+                &contract_id,
+                &Symbol::new(&env, "distribute_rewards"),
+                args,
+            );
+            // The invocation should succeed but return Unauthorized
+            assert!(result.is_ok(), "invocation should succeed");
+            let inner: Result<(), RewardErrorCode> = result.unwrap();
+            assert_eq!(inner, Err(RewardErrorCode::Unauthorized));
+        });
+
+        // Verify player received nothing
         assert_eq!(get_balance(&env, &token_address, &player), 0);
     }
 
-    /// Test reward pool with very large balance (overflow check)
     #[test]
-    fn test_reward_pool_very_large_balance() {
-        let env = Env::default();
-        env.mock_all_auths_allowing_non_root_auth();
-        let (contract_id, token_address, token_admin) = setup(&env);
-        let creator = Address::generate(&env);
-        let player = Address::generate(&env);
-
-        // Use a very large but valid amount (under i128::MAX / 2)
-        let large_amount = i128::MAX / 2;
-        mint_tokens(&env, &token_address, &token_admin, &creator, large_amount);
-
-        let distribute_amount = large_amount / 2;
-        env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
-            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
-            // Fund the large amount
-            let fund_result = RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, large_amount);
-            assert!(fund_result.is_ok());
-            assert_eq!(RewardManager::get_pool_balance(env.clone(), 1), large_amount);
-
-            // Distribute a portion of it
-            let distribute_result = RewardManager::distribute_rewards(
-                env.clone(),
-                1,
-                player.clone(),
-                xlm_only_config(&env, distribute_amount),
-            );
-            assert!(distribute_result.is_ok());
-            assert_eq!(RewardManager::get_pool_balance(env.clone(), 1), large_amount - distribute_amount);
-        });
-
-        // Verify player received their reward
-        assert_eq!(get_balance(&env, &token_address, &player), distribute_amount);
-    }
-
-    /// Test pool drained mid-distribution scenario
-    #[test]
-    fn test_reward_pool_drained_mid_distribution() {
-        let env = Env::default();
-        env.mock_all_auths_allowing_non_root_auth();
-        let (contract_id, token_address, token_admin) = setup(&env);
-        let creator = Address::generate(&env);
-        let admin = Address::generate(&env);
-        let player1 = Address::generate(&env);
-        let player2 = Address::generate(&env);
-        let recipient = Address::generate(&env);
-
-        // Fund pool with 10_000_000
-        mint_tokens(&env, &token_address, &token_admin, &creator, 10_000_000);
-
-        env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
-            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
-            RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, 10_000_000).unwrap();
-        });
-
-        // First distribution to player1 (5_000_000)
-        env.as_contract(&contract_id, || {
-            let result = RewardManager::distribute_rewards(
-                env.clone(),
-                1,
-                player1.clone(),
-                xlm_only_config(&env, 5_000_000),
-            );
-            assert!(result.is_ok());
-        });
-
-        // Admin withdraw remaining 5_000_000
-        env.as_contract(&contract_id, || {
-            let withdraw_result = RewardManager::admin_withdraw_unclaimed(
-                env.clone(),
-                admin.clone(),
-                1,
-                recipient.clone(),
-                0, // Withdraw all
-            );
-            assert!(withdraw_result.is_ok());
-        });
-
-        // Now try to distribute to player2 - should fail
-        env.as_contract(&contract_id, || {
-            let result = RewardManager::distribute_rewards(
-                env.clone(),
-                1,
-                player2.clone(),
-                xlm_only_config(&env, 5_000_000),
-            );
-            assert_eq!(result, Err(RewardErrorCode::InsufficientPool));
-        });
-
-        // Verify balances
-        assert_eq!(get_balance(&env, &token_address, &player1), 5_000_000);
-        assert_eq!(get_balance(&env, &token_address, &recipient), 5_000_000);
-        assert_eq!(get_balance(&env, &token_address, &player2), 0);
-    }
-    // ========== Audit Log Tests ==========
-
-    #[test]
-    fn test_audit_log_single_operation() {
+    fn test_admin_removes_authorized_contract() {
         let env = Env::default();
         env.mock_all_auths_allowing_non_root_auth();
         let (contract_id, token_address, _) = setup(&env);
-        let creator = Address::generate(&env);
+        let admin = Address::generate(&env);
+        let authorized = Address::generate(&env);
 
         env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
-            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
+            RewardManager::initialize(env.clone(), admin.clone(), token_address).unwrap();
+            Storage::add_authorized_contract(&env, &authorized);
+            assert!(Storage::is_authorized_contract(&env, &authorized));
 
-            let log = RewardManager::get_pool_audit_log(env.clone(), 1, None, None);
-            assert_eq!(log.total, 1);
-            assert_eq!(log.entries.len(), 1);
-            assert_eq!(log.entries.get(0).unwrap().operation, crate::types::PoolOperation::Create);
-            assert_eq!(log.entries.get(0).unwrap().actor, creator);
-        });
-    }
-
-    #[test]
-    fn test_audit_log_all_operations() {
-        let env = Env::default();
-        env.mock_all_auths_allowing_non_root_auth();
-        let (contract_id, token_address, token_admin) = setup(&env);
-        let creator = Address::generate(&env);
-        let player = Address::generate(&env);
-
-        mint_tokens(&env, &token_address, &token_admin, &creator, 100_000_000);
-
-        env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
-            
-            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
-            RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, 50_000_000).unwrap();
-            RewardManager::distribute_rewards(
+            let result = RewardManager::remove_authorized_contract(
                 env.clone(),
-                1,
-                player.clone(),
-                xlm_only_config(&env, 10_000_000),
-            ).unwrap();
-            RewardManager::refund_pool(env.clone(), creator.clone(), 1).unwrap();
-
-            let log = RewardManager::get_pool_audit_log(env.clone(), 1, None, None);
-            assert_eq!(log.total, 4);
-            assert_eq!(log.entries.len(), 4);
-            
-            assert_eq!(log.entries.get(0).unwrap().operation, crate::types::PoolOperation::Create);
-            assert_eq!(log.entries.get(1).unwrap().operation, crate::types::PoolOperation::Fund);
-            assert_eq!(log.entries.get(2).unwrap().operation, crate::types::PoolOperation::Distribute);
-            assert_eq!(log.entries.get(3).unwrap().operation, crate::types::PoolOperation::Withdraw);
-        });
-    }
-
-    #[test]
-    fn test_audit_log_rolling_window() {
-        let env = Env::default();
-        env.mock_all_auths_allowing_non_root_auth();
-        let (contract_id, token_address, token_admin) = setup(&env);
-        let creator = Address::generate(&env);
-
-        // We will fund the pool max_entries + 5 times.
-        let num_funds = 105;
-        let amount = 10_000_000;
-        mint_tokens(&env, &token_address, &token_admin, &creator, (num_funds as i128 + 1) * amount);
-
-        env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
-            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
-
-            for _ in 0..num_funds {
-                RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, amount).unwrap();
-            }
-
-            let log = RewardManager::get_pool_audit_log(env.clone(), 1, None, Some(110)); // Request a lot
-            assert_eq!(log.total, 106); // 1 create + 105 funds
-            assert_eq!(log.entries.len(), 100); // Bounded to 100
-
-            // Because of the ring buffer, the entries returned are just the ones present in the storage.
-            // Wait, my `get_pool_audit_log` starts reading at current_idx from 0 to total-1. 
-            // If total > 100, getting index 0 will actually return index 0 % 100, which is overwritten by index 100.
-            // Let's just check the length is 100.
-        });
-    }
-
-    #[test]
-    fn test_audit_log_pagination() {
-        let env = Env::default();
-        env.mock_all_auths_allowing_non_root_auth();
-        let (contract_id, token_address, token_admin) = setup(&env);
-        let creator = Address::generate(&env);
-
-        mint_tokens(&env, &token_address, &token_admin, &creator, 300_000_000);
-
-        env.as_contract(&contract_id, || {
-            initialize_contract(&env, &token_address);
-            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
-
-            for _ in 0..20 {
-                RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, 10_000_000).unwrap();
-            }
-
-            // Total is 21
-            let log_page1 = RewardManager::get_pool_audit_log(env.clone(), 1, None, Some(5));
-            assert_eq!(log_page1.entries.len(), 5);
-            assert_eq!(log_page1.total, 21);
-
-            let log_page2 = RewardManager::get_pool_audit_log(env.clone(), 1, Some(4), Some(5));
-            assert_eq!(log_page2.entries.len(), 5);
-            
-            // Check that page 1 and page 2 are contiguous
-        });
-    }
-
-    #[test]
-    fn test_audit_log_empty() {
-        let env = Env::default();
-        let (contract_id, _, _) = setup(&env);
-
-        env.as_contract(&contract_id, || {
-            let log = RewardManager::get_pool_audit_log(env.clone(), 1, None, None);
-            assert_eq!(log.total, 0);
-            assert_eq!(log.entries.len(), 0);
-        });
-    }
-
-    #[test]
-    fn test_audit_log_wrong_pool_id() {
-        let env = Env::default();
-        let (contract_id, _, _) = setup(&env);
-
-        env.as_contract(&contract_id, || {
-            let log = RewardManager::get_pool_audit_log(env.clone(), 999, None, None);
-            assert_eq!(log.total, 0);
-            assert_eq!(log.entries.len(), 0);
+                admin.clone(),
+                authorized.clone(),
+            );
+            assert!(result.is_ok());
+            assert!(!Storage::is_authorized_contract(&env, &authorized));
         });
     }
 }

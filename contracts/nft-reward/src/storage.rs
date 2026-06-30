@@ -11,17 +11,12 @@ impl Storage {
     const NFT_META_KEY: soroban_sdk::Symbol = symbol_short!("NM");
     const NFT_COUNTER_KEY: soroban_sdk::Symbol = symbol_short!("CN");
     const OWNER_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("ONFC");
-    const HUNT_NFT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("HN");
-    const MAX_SUPPLY_KEY: soroban_sdk::Symbol = symbol_short!("MA");
-    const INITIALIZED_KEY: soroban_sdk::Symbol = symbol_short!("I");
-    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("A");
-    const MINTER_KEY: soroban_sdk::Symbol = symbol_short!("MN");
-    const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("R");
-    const NFT_VERSION_KEY: soroban_sdk::Symbol = symbol_short!("NV");
-    const TOTAL_HUNTS_KEY: soroban_sdk::Symbol = symbol_short!("TH");
-    const TOTAL_OWNERS_KEY: soroban_sdk::Symbol = symbol_short!("TO");
-    const ALL_NFTS_KEY: soroban_sdk::Symbol = symbol_short!("AN");
-    const CONTRACT_VERSION_KEY: soroban_sdk::Symbol = symbol_short!("CV");
+    const MAX_SUPPLY_KEY: soroban_sdk::Symbol = symbol_short!("MAXS");
+    const INITIALIZED_KEY: soroban_sdk::Symbol = symbol_short!("INIT");
+    const ADMIN_KEY: soroban_sdk::Symbol = symbol_short!("ADMIN");
+    const MINTER_KEY: soroban_sdk::Symbol = symbol_short!("MNTR");
+    const REWARD_MGR_KEY: soroban_sdk::Symbol = symbol_short!("RWDMGR");
+    const HAS_AUTH_KEY: soroban_sdk::Symbol = symbol_short!("HAUTH");
 
     fn nft_key(nft_id: u64) -> (soroban_sdk::Symbol, u64) {
         (Self::NFT_KEY, nft_id)
@@ -67,15 +62,13 @@ impl Storage {
         (Self::MINTER_KEY, minter.clone())
     }
 
-    fn operator_key(
-        owner: &Address,
-        operator: &Address,
-    ) -> (soroban_sdk::Symbol, Address, Address) {
-        (symbol_short!("OPKEY"), owner.clone(), operator.clone())
+    fn authorized_contract_key(contract: &Address) -> (soroban_sdk::Symbol, Address) {
+        (symbol_short!("AUTH"), contract.clone())
     }
 
-    fn locker_key(locker: &Address) -> (soroban_sdk::Symbol, Address) {
-        (symbol_short!("LOCKR"), locker.clone())
+    pub fn remove_nft(env: &Env, nft_id: u64) {
+        let key = Self::nft_key(nft_id);
+        env.storage().persistent().remove(&key);
     }
 
     pub fn save_admin(env: &Env, admin: &Address) {
@@ -115,6 +108,28 @@ impl Storage {
     #[allow(dead_code)]
     pub fn is_minter(env: &Env, minter: &Address) -> bool {
         let key = Self::minter_key(minter);
+        env.storage().persistent().get(&key).unwrap_or(false)
+    }
+
+    // --- Authorized cross-contract callers ---
+
+    pub fn has_authorized_contracts(env: &Env) -> bool {
+        env.storage().instance().get(&Self::HAS_AUTH_KEY).unwrap_or(false)
+    }
+
+    pub fn add_authorized_contract(env: &Env, contract: &Address) {
+        let key = Self::authorized_contract_key(contract);
+        env.storage().persistent().set(&key, &true);
+        env.storage().instance().set(&Self::HAS_AUTH_KEY, &true);
+    }
+
+    pub fn remove_authorized_contract(env: &Env, contract: &Address) {
+        let key = Self::authorized_contract_key(contract);
+        env.storage().persistent().remove(&key);
+    }
+
+    pub fn is_authorized_contract(env: &Env, contract: &Address) -> bool {
+        let key = Self::authorized_contract_key(contract);
         env.storage().persistent().get(&key).unwrap_or(false)
     }
 
