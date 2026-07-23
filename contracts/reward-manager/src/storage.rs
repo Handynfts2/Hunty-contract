@@ -1,6 +1,7 @@
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{symbol_short, Address, Env, Vec};
 
-use crate::types::{DistributionRecord, RewardPoolConfig, PoolAuditEntry, PoolOperation};
+use crate::types::{DistributionRecord, PoolAuditEntry, PoolDistribution, PoolOperation, RewardPoolConfig};
+
 pub struct Storage;
 
 impl Storage {
@@ -18,14 +19,21 @@ impl Storage {
     const DIST_RECORD_KEY: soroban_sdk::Symbol = symbol_short!("DR");
     const DIST_NONCE_KEY: soroban_sdk::Symbol = symbol_short!("DN");
     const DIST_RESOLVE_KEY: soroban_sdk::Symbol = symbol_short!("DRS");
+    const POOL_DISTRIBUTIONS_KEY: soroban_sdk::Symbol = symbol_short!("PLDIST");
     const POOL_KEY: soroban_sdk::Symbol = symbol_short!("POOL");
     const POOL_CFG_KEY: soroban_sdk::Symbol = symbol_short!("PCFG");
     const POOL_DEP_KEY: soroban_sdk::Symbol = symbol_short!("PDEP");
     const POOL_DST_KEY: soroban_sdk::Symbol = symbol_short!("PDST");
-    const HUNTY_CORE_KEY: soroban_sdk::Symbol = symbol_short!("HCORE");
     const TOTAL_XLM_DST_KEY: soroban_sdk::Symbol = symbol_short!("TXDST");
+    const HUNTY_CORE_KEY: soroban_sdk::Symbol = symbol_short!("HCORE");
     const IN_DISTRIBUTION_KEY: soroban_sdk::Symbol = symbol_short!("IN_DIST");
     const HAS_AUTH_KEY: soroban_sdk::Symbol = symbol_short!("HAUTH");
+    const AUDIT_COUNT_KEY: soroban_sdk::Symbol = symbol_short!("ACNT");
+    const AUDIT_LOG_KEY: soroban_sdk::Symbol = symbol_short!("ALOG");
+    const MAX_AUDIT_ENTRIES_PER_POOL: u64 = 50;
+    const PENDING_NFT_KEY: soroban_sdk::Symbol = symbol_short!("PNFT");
+    const PAUSED_KEY: soroban_sdk::Symbol = symbol_short!("PAUSED");
+    const EMERGENCY_LOG_KEY: soroban_sdk::Symbol = symbol_short!("EMLOG");
 
     // ========== Admin ==========
 
@@ -119,6 +127,60 @@ impl Storage {
         let new_nonce = current_nonce + 1;
         Self::set_distribution_nonce(env, hunt_id, player, new_nonce);
         new_nonce
+    }
+
+    // ========== Pool Distribution List ==========
+
+    /// Adds a distribution record to the pool's distribution list.
+    pub fn add_pool_distribution(env: &Env, hunt_id: u64, distribution: PoolDistribution) {
+        let key = Self::pool_distributions_key(hunt_id);
+        let mut distributions: Vec<PoolDistribution> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(env));
+        distributions.push_back(distribution);
+        env.storage().persistent().set(&key, &distributions);
+    }
+
+    /// Returns paginated list of distributions for a pool.
+    /// Returns up to `limit` entries starting from `offset`.
+    pub fn get_pool_distributions(
+        env: &Env,
+        hunt_id: u64,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<PoolDistribution> {
+        let key = Self::pool_distributions_key(hunt_id);
+        let all_distributions: Vec<PoolDistribution> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(env));
+
+        let total = all_distributions.len();
+        if offset as usize >= total {
+            return Vec::new(env);
+        }
+
+        let end_index = core::cmp::min(offset as usize + limit as usize, total);
+        all_distributions
+            .iter()
+            .skip(offset as usize)
+            .take(end_index - offset as usize)
+            .cloned()
+            .collect::<Vec<_>>();
+    }
+
+    /// Returns the total count of distributions for a pool.
+    pub fn get_pool_distribution_count(env: &Env, hunt_id: u64) -> u32 {
+        let key = Self::pool_distributions_key(hunt_id);
+        let distributions: Vec<PoolDistribution> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(env));
+        distributions.len() as u32
     }
 
     fn distribution_record_key(
@@ -327,6 +389,10 @@ impl Storage {
 
     fn pool_dst_key(hunt_id: u64) -> (soroban_sdk::Symbol, u64) {
         (Self::POOL_DST_KEY, hunt_id)
+    }
+
+    fn pool_distributions_key(hunt_id: u64) -> (soroban_sdk::Symbol, u64) {
+        (Self::POOL_DISTRIBUTIONS_KEY, hunt_id)
     }
 
     // ========== Audit Log ==========

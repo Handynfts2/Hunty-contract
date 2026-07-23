@@ -45,6 +45,15 @@ pub struct DistributionRecord {
     pub nft_id: Option<u64>,
 }
 
+/// Public view of a distribution from a reward pool, including player address.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoolDistribution {
+    pub player: Address,
+    pub xlm_amount: i128,
+    pub nft_id: Option<u64>,
+}
+
 /// Configuration for a reward pool, set at creation time.
 ///
 /// `time_based_tiers` is an optional list of (max_elapsed_seconds, xlm_amount)

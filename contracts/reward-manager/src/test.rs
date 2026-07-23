@@ -2165,4 +2165,102 @@ fn test_distribute_rewards_failed_nft_creates_pending_entry() {
             assert!(!Storage::is_authorized_contract(&env, &authorized));
         });
     }
+
+    /// Test get_pool_distributions with pagination
+    #[test]
+    fn test_get_pool_distributions_pagination() {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        let (contract_id, token_address, token_admin) = setup(&env);
+        let creator = Address::generate(&env);
+        let player1 = Address::generate(&env);
+        let player2 = Address::generate(&env);
+        let player3 = Address::generate(&env);
+
+        // Fund pool with enough for 3 distributions
+        mint_tokens(&env, &token_address, &token_admin, &creator, 30_000_000);
+
+        env.as_contract(&contract_id, || {
+            initialize_contract(&env, &token_address);
+            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
+            RewardManager::fund_reward_pool(env.clone(), creator.clone(), 1, 30_000_000).unwrap();
+        });
+
+        // Distribute to 3 players
+        env.as_contract(&contract_id, || {
+            RewardManager::distribute_rewards(
+                env.clone(),
+                1,
+                player1.clone(),
+                xlm_only_config(&env, 10_000_000),
+            )
+            .unwrap();
+            RewardManager::distribute_rewards(
+                env.clone(),
+                1,
+                player2.clone(),
+                xlm_only_config(&env, 10_000_000),
+            )
+            .unwrap();
+            RewardManager::distribute_rewards(
+                env.clone(),
+                1,
+                player3.clone(),
+                xlm_only_config(&env, 10_000_000),
+            )
+            .unwrap();
+        });
+
+        // Test pagination
+        env.as_contract(&contract_id, || {
+            // Get total count
+            let count = RewardManager::get_pool_distribution_count(env.clone(), 1);
+            assert_eq!(count, 3);
+
+            // Get first page (limit 2)
+            let page1 = RewardManager::get_pool_distributions(env.clone(), 1, 0, 2);
+            assert_eq!(page1.len(), 2);
+            assert_eq!(page1.get(0).unwrap().player, player1);
+            assert_eq!(page1.get(0).unwrap().xlm_amount, 10_000_000);
+            assert_eq!(page1.get(1).unwrap().player, player2);
+            assert_eq!(page1.get(1).unwrap().xlm_amount, 10_000_000);
+
+            // Get second page (offset 2, limit 2)
+            let page2 = RewardManager::get_pool_distributions(env.clone(), 1, 2, 2);
+            assert_eq!(page2.len(), 1);
+            assert_eq!(page2.get(0).unwrap().player, player3);
+            assert_eq!(page2.get(0).unwrap().xlm_amount, 10_000_000);
+
+            // Get empty page (offset beyond list)
+            let page3 = RewardManager::get_pool_distributions(env.clone(), 1, 10, 2);
+            assert_eq!(page3.len(), 0);
+
+            // Get all at once
+            let all = RewardManager::get_pool_distributions(env.clone(), 1, 0, 100);
+            assert_eq!(all.len(), 3);
+        });
+    }
+
+    /// Test get_pool_distributions for empty pool
+    #[test]
+    fn test_get_pool_distributions_empty() {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        let (contract_id, token_address, token_admin) = setup(&env);
+        let creator = Address::generate(&env);
+
+        env.as_contract(&contract_id, || {
+            initialize_contract(&env, &token_address);
+            RewardManager::create_reward_pool(env.clone(), creator.clone(), 1, 0).unwrap();
+        });
+
+        env.as_contract(&contract_id, || {
+            // Empty pool should return 0 count and empty list
+            let count = RewardManager::get_pool_distribution_count(env.clone(), 1);
+            assert_eq!(count, 0);
+
+            let distributions = RewardManager::get_pool_distributions(env.clone(), 1, 0, 10);
+            assert_eq!(distributions.len(), 0);
+        });
+    }
 }

@@ -8,10 +8,8 @@ use crate::nft_handler::NftHandler;
 use crate::storage::Storage;
 pub use crate::types::{
     resolve_tier_amount, tiers_are_strictly_ascending, DistributionRecord, DistributionStatus,
-    RewardConfig, RewardPoolConfig, RewardPoolStatus, SemVer, TierError, TimeBasedRewardTier,
-    ValidationResult,
-    DistributionRecord, DistributionStatus, ResolutionStatus, RewardConfig, RewardPoolConfig,
-    RewardPoolStatus, SemVer, ValidationResult,
+    PoolDistribution, RewardConfig, RewardPoolConfig, RewardPoolStatus, ResolutionStatus,
+    SemVer, TierError, TimeBasedRewardTier, ValidationResult,
 };
 use crate::xlm_handler::XlmHandler;
 
@@ -818,7 +816,15 @@ impl RewardManager {
             &player_address,
             &DistributionRecord { xlm_amount, nft_id },
         );
-        
+
+        // Add to pool distribution list for querying
+        let pool_distribution = crate::types::PoolDistribution {
+            player: player_address.clone(),
+            xlm_amount,
+            nft_id,
+        };
+        Storage::add_pool_distribution(&env, hunt_id, pool_distribution);
+
         // Increment nonce atomically after successful distribution
         // Instance storage is immutable and not subject to TTL expiration
         Storage::increment_distribution_nonce(&env, hunt_id, &player_address);
@@ -1020,6 +1026,36 @@ impl RewardManager {
         );
 
         Ok(())
+    }
+
+    /// Returns a paginated list of distributions made from a specific reward pool.
+    ///
+    /// # Arguments
+    /// * `hunt_id` - The hunt whose pool distributions to query
+    /// * `offset` - Starting index for pagination (0-based)
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// A Vec of PoolDistribution entries containing player addresses and distribution details.
+    /// Returns an empty Vec if the pool has no distributions or offset is beyond the list.
+    pub fn get_pool_distributions(
+        env: Env,
+        hunt_id: u64,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<PoolDistribution> {
+        Storage::get_pool_distributions(&env, hunt_id, offset, limit)
+    }
+
+    /// Returns the total count of distributions made from a specific reward pool.
+    ///
+    /// # Arguments
+    /// * `hunt_id` - The hunt whose pool distribution count to query
+    ///
+    /// # Returns
+    /// The total number of distributions for the pool.
+    pub fn get_pool_distribution_count(env: Env, hunt_id: u64) -> u32 {
+        Storage::get_pool_distribution_count(&env, hunt_id)
     }
 
     /// Allows the admin to withdraw any unclaimed (surplus) XLM remaining in a reward pool.
