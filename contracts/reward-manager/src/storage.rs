@@ -164,12 +164,13 @@ impl Storage {
         }
 
         let end_index = core::cmp::min(offset as usize + limit as usize, total);
-        all_distributions
-            .iter()
-            .skip(offset as usize)
-            .take(end_index - offset as usize)
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut result = Vec::new(env);
+        for i in offset as usize..end_index {
+            if let Some(distribution) = all_distributions.get(i) {
+                result.push_back(distribution.clone());
+            }
+        }
+        result
     }
 
     /// Returns the total count of distributions for a pool.
